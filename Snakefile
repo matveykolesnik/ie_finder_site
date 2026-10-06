@@ -8,7 +8,6 @@ GENOMES_DIR = config["paths"]["genomes_dir"]
 RESULTS_DIR = config["paths"]["results_dir"]
 PFAM_LIST = config["pfam_profiles"]
 PFAM_CLI_ARGS = " ".join(f"--pfam '{pfam}'" for pfam in PFAM_LIST)
-ENV = config["execution"]["conda_env"]
 ALL_CANDIDATES = bool(config.get("annotate", {}).get("all_candidates", False))
 FINDER = os.path.join(workflow.basedir, "scripts")
 
@@ -62,8 +61,6 @@ rule predict_orfs:
         os.path.join(RESULTS_DIR, "{sample}", "predict_orfs.log")
     params:
         finder=FINDER
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/predict_orfs.py --fna {input.fna} --gff {output.gff} --ffn {output.ffn} --faa {output.faa} > {log} 2>&1
@@ -74,8 +71,6 @@ rule build_combined_hmm:
         COMBINED_HMM
     log:
         os.path.join(RESULTS_DIR, "combined", "build_combined_hmm.log")
-    conda:
-        f"{ENV}"
     params:
         finder=FINDER,
         pfam_args=PFAM_CLI_ARGS
@@ -98,8 +93,6 @@ rule hmm_search:
         orfs=os.path.join(RESULTS_DIR, "{sample}", "integrase_orfs.tsv")
     log:
         os.path.join(RESULTS_DIR, "{sample}", "hmm_search.log")
-    conda:
-        f"{ENV}"
     params:
         finder=FINDER,
         skip_log=os.path.join(RESULTS_DIR, "hmmscan_skipped.tsv")
@@ -124,8 +117,6 @@ rule predict_trna:
         trna=os.path.join(RESULTS_DIR, "{sample}", "trna.tsv")
     log:
         os.path.join(RESULTS_DIR, "{sample}", "predict_trna.log")
-    conda:
-        f"{ENV}"
     shell:
         """
         aragorn -w -t -o {output.trna} {input.fna} > {log} 2>&1
@@ -142,8 +133,6 @@ rule trna_proximity:
     params:
         finder=FINDER,
         max_distance=config.get("filters", {}).get("trna_max_distance_bp", 500),
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/annotate_trna_proximity.py --integrases {input.integrases} --trna {input.trna} --output {output.proximity} --max_distance {params.max_distance} > {log} 2>&1
@@ -159,8 +148,6 @@ rule extract_trna_region:
         os.path.join(RESULTS_DIR, "{sample}", "extract_trna_region.log")
     params:
         finder=FINDER
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/extract_trna_region.py --ffn {input.fasta} --trnas {input.trnas} --out_fa {output.out_fa} > {log} 2>&1
@@ -179,8 +166,6 @@ rule blast_mge:
     params:
         finder=FINDER,
         config=config["paths"].get("config_file", "ie_finder_config.yaml"),
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/annotate_mge_region.py --ffn {input.fna} --integrases {input.integrases} --query {input.query} --out_tsv {output.blast_tsv} --tmp_dir . --config {params.config} > {log} 2>&1
@@ -197,8 +182,6 @@ rule extract_mge_region:
         os.path.join(RESULTS_DIR, "{sample}", "extract_mge_region.log")
     params:
         finder=FINDER
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/extract_mge_regions.py --fna {input.fna} --blast {input.blast} --trna {input.trna} --out_fa {output.mge_fa} > {log} 2>&1
@@ -217,8 +200,6 @@ rule annotate_mge:
         os.path.join(RESULTS_DIR, "{sample}", "annotate_mge.log")
     params:
         finder=FINDER
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/annotate_and_orient_mge.py \
@@ -250,8 +231,6 @@ rule filter_confident_ie:
         os.path.join(RESULTS_DIR, "{sample}", "filter_confident_ie.log")
     params:
         finder=FINDER
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.finder}/filter_confident_ie.py \
@@ -284,8 +263,6 @@ rule export_genome_features:
     params:
         site=os.path.join(workflow.basedir, "scripts"),
         extra="--all-candidates" if ALL_CANDIDATES else "",
-    conda:
-        f"{ENV}"
     shell:
         """
         python {params.site}/export_genome_features.py \

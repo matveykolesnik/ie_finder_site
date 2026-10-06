@@ -7,6 +7,9 @@
 #   ANNOTATE_ALL=1 ./run.sh strain.fasta outdir
 #   KEEP_WORK=1 ./run.sh strain.fasta outdir
 #
+# The first run creates the conda environment named in envs/IE_finder.yaml
+# and puts it on PATH. Later runs reuse it. Thresholds stay in ie_finder_config.yaml.
+#
 # Extra arguments after the outdir are passed to Snakemake.
 
 set -euo pipefail
@@ -109,6 +112,83 @@ else
 fi
 shopt -u nullglob
 
+find_conda() {
+  local candidate
+  if [[ -n "${CONDA_EXE:-}" && -x "$CONDA_EXE" ]]; then
+    echo "$CONDA_EXE"
+    return 0
+  fi
+  candidate="$(command -v conda 2>/dev/null || true)"
+  if [[ -n "$candidate" && -x "$candidate" ]]; then
+    echo "$candidate"
+    return 0
+  fi
+  for candidate in \
+    "$HOME/miniforge3/bin/conda" \
+    "$HOME/mambaforge/bin/conda" \
+    "$HOME/miniconda3/bin/conda" \
+    "$HOME/anaconda3/bin/conda" \
+    "/opt/miniforge3/bin/conda" \
+    "/opt/conda/bin/conda"
+  do
+    if [[ -x "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+install_miniforge() {
+  local dest arch url installer
+  dest="${MINIFORGE_ROOT:-$HOME/miniforge3}"
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|aarch64) ;;
+    *)
+      echo "conda is not installed, and Miniforge has no build for $arch" >&2
+      exit 1
+      ;;
+  esac
+  if [[ -x "$dest/bin/conda" ]]; then
+    echo "$dest/bin/conda"
+    return 0
+  fi
+  url="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname -s)-${arch}.sh"
+  installer="$(mktemp "${TMPDIR:-/tmp}/Miniforge3.XXXXXX.sh")"
+  echo "Installing Miniforge to $dest" >&2
+  curl -fL --retry 3 -o "$installer" "$url"
+  bash "$installer" -b -p "$dest"
+  rm -f "$installer"
+  echo "$dest/bin/conda"
+}
+
+ensure_runtime() {
+  local conda_bin base name prefix
+  if ! conda_bin="$(find_conda)"; then
+    conda_bin="$(install_miniforge)"
+  fi
+  name="$(awk '/^name:/{print $2; exit}' "$SCRIPT_DIR/envs/IE_finder.yaml")"
+  base="$("$conda_bin" info --base)"
+  prefix="$base/envs/$name"
+  if [[ ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/prodigal" || ! -x "$prefix/bin/hmmscan" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
+    echo "Building conda environment $name from envs/IE_finder.yaml" >&2
+    if [[ -d "$prefix" ]]; then
+      "$conda_bin" env update -p "$prefix" -f "$SCRIPT_DIR/envs/IE_finder.yaml"
+    else
+      "$conda_bin" env create -f "$SCRIPT_DIR/envs/IE_finder.yaml"
+    fi
+  fi
+  if [[ ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/python3" ]]; then
+    echo "Environment $name has no snakemake after creation: $prefix" >&2
+    exit 1
+  fi
+  export PATH="$prefix/bin:${PATH:-}"
+  hash -r
+}
+
+ensure_runtime
+
 CONFIG="$WORK/config.yaml"
 python3 - "$SCRIPT_DIR/ie_finder_config.yaml" "$CONFIG" "$SCRIPT_DIR" "$GENOMES" "$RESULTS" "${ANNOTATE_ALL:-0}" << 'PY'
 import sys
@@ -138,28 +218,17 @@ PY
 
 SM="${SNAKEMAKE:-snakemake}"
 if ! command -v "$SM" >/dev/null 2>&1; then
-  if [[ -x "$HOME/miniforge3/envs/snakemake/bin/snakemake" ]]; then
-    SM="$HOME/miniforge3/envs/snakemake/bin/snakemake"
-  else
-    echo "snakemake is not on PATH" >&2
-    exit 1
-  fi
+  echo "snakemake is not on PATH after building the environment" >&2
+  exit 1
 fi
 
-CONDA_ARGS=()
-if [[ "${USE_CONDA:-0}" == "1" ]]; then
-  CONDAP="${SNAKEMAKE_CONDA_PREFIX:-${MINIFORGE_ENVS:-$HOME/miniforge3/envs}}"
-  CONDA_ARGS=(--use-conda --conda-prefix "$CONDAP")
-fi
-
-"$SM" \
+PYTHONWARNINGS="${PYTHONWARNINGS:-ignore::FutureWarning}" "$SM" \
   --snakefile "$SCRIPT_DIR/Snakefile" \
   --configfile "$CONFIG" \
   --cores "$(nproc)" \
   --printshellcmds \
   --show-failed-logs \
   --rerun-incomplete \
-  "${CONDA_ARGS[@]}" \
   "$@"
 
 shopt -s nullglob
