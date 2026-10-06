@@ -1,18 +1,103 @@
 # ie_finder_site
 
-A reduced copy of the MGE_finder discovery workflow. It runs on its own: the integrase HMMs, the search scripts, and the conda environment are in this repository. `UPSTREAM` records which commit of [MGE_finder](https://github.com/rljech13/MGE_finder) the copy was taken from. A checkout of that repository is not required.
+A reduced, self-contained copy of the MGE_finder discovery workflow. The integrase HMMs, the search scripts, and the conda environment are in this repository. `UPSTREAM` records which commit of [MGE_finder](https://github.com/rljech13/MGE_finder) the copy was taken from. A checkout of that repository is not required.
+
+The pipeline reads a genome assembly in FASTA and writes attL/attR, the integrase, and the element span in the coordinates of that assembly. The files are meant to sit next to a strain's genome annotation on a catalogue such as the [Resources](https://hotspringslab.ru/en/resources) page of the Laboratory of Molecular Genetics of Microorganisms. That site is the example below. This repository does not upload anything by itself.
+
+## What an element is
+
+A confident element is a phage-type tyrosine integrase next to an opposite-strand tRNA, with a direct repeat of that tRNA 3′ end. The integrase is longer than 300 aa, attL does not overlap a CDS, and the repeat is either an exact run of at least 14 bp or a BLAST hit of at least 17 bp without alignment gaps. Those thresholds are `filters` in `ie_finder_config.yaml`. Cohort deduplication from the main repository is not part of this copy.
+
+## Requirements
+
+Linux, and either:
+
+- Prodigal, HMMER (`hmmscan`), Aragorn, BLAST+ (`makeblastdb`, `blastn`), Snakemake, and Python 3.10 with Biopython, pandas, and PyYAML, or
+- a conda/mamba install, in which case `USE_CONDA=1` builds `envs/IE_finder.yaml` on the first run.
+
+Snakemake has to be on `PATH` before `USE_CONDA=1` can create the tool environment.
+
+## Install
 
 ```bash
-./run.sh strain.fasta outdir
+git clone https://github.com/rljech13/ie_finder_site.git
+cd ie_finder_site
+```
+
+## Run
+
+One assembly, or a directory of assemblies. The sample name is the file name without its last suffix, so name the file after the strain.
+
+```bash
+./run.sh TTHB27c.fasta outdir
 ./run.sh genomes_dir outdir
 ```
 
+Accepted suffixes in a directory are `.fna`, `.fa`, `.fasta`, and `.fsa`. Two files that share a stem are an error.
+
 `outdir/` receives three files per assembly:
 
-- `strain.ie.gff3`
-- `strain.ie.gbk`
-- `strain.ie.report.txt` — one report: how many integrases and tRNA pairs were found, why a candidate was rejected, the published coordinates, and any step log that was not empty
+| file | role |
+|---|---|
+| `TTHB27c.ie.gff3` | features on the input contigs, for a browser track or a download |
+| `TTHB27c.ie.gbk` | the same contigs and features in GenBank |
+| `TTHB27c.ie.report.txt` | one report: counts, why a candidate was rejected, the published coordinates, and any step log that was not empty |
 
-Coordinates are 1-based on the contigs of the input FASTA. Each element has a span, attL, attR, and the integrase CDS. Intermediate tables and the cut-out islands are written to a temporary directory and then removed. `KEEP_WORK=1` keeps that directory. `ANNOTATE_ALL=1` also writes candidates that have an attL but failed a later filter. If the run fails, the report is still written from whatever finished.
+Coordinates are 1-based and inclusive. They refer to the contigs of the FASTA you passed in. The first column of the GFF3 is that FASTA record id.
 
-Thresholds are in `ie_finder_config.yaml`. On a fresh machine, `USE_CONDA=1 ./run.sh ...` builds `envs/IE_finder.yaml`.
+Each element has four features:
+
+| GFF3 type | GenBank key | meaning |
+|---|---|---|
+| `mobile_genetic_element` | `mobile_element` | span from attR to attL |
+| `attachment_site` with `Note=attR` | `misc_feature` / `attR` | the tRNA that was the integration site |
+| `attachment_site` with `Note=attL` | `misc_feature` / `attL` | the direct repeat of the tRNA 3′ end |
+| `CDS` | `CDS` | the tyrosine integrase |
+
+`confidence=confident` passed the filter. A run with no confident element still writes a valid GFF3 header and an empty GenBank, plus a report that says so.
+
+Intermediate tables, BLAST output, and the cut-out island sequences are written to a temporary directory and removed when the run succeeds. Do not publish those island GenBank files: their coordinates are local to the extracted sequence, which may have been reverse-complemented. Only `*.ie.gff3` and `*.ie.gbk` use the assembly coordinates.
+
+## Options
+
+```bash
+ANNOTATE_ALL=1 ./run.sh TTHB27c.fasta outdir
+KEEP_WORK=1 ./run.sh TTHB27c.fasta outdir
+USE_CONDA=1 ./run.sh TTHB27c.fasta outdir
+./run.sh TTHB27c.fasta outdir --cores 8
+```
+
+`ANNOTATE_ALL=1` also writes candidates that have an attL coordinate but failed a later filter. In the GFF3 and the report their `confidence` is `candidate`.
+
+`KEEP_WORK=1` leaves the temporary directory. The path is printed only when a run fails or when this flag is set. Use it to see the raw tables behind the report.
+
+Arguments after the output directory are passed to Snakemake.
+
+## The report
+
+`strain.ie.report.txt` is the log for that genome. It has four blocks:
+
+- `counts` — integrase HMM hits, integrase–tRNA pairs, attL BLAST hits, how many passed
+- `candidates` — one line each: `confident` or `rejected` plus the first failing reason (`exact_run_too_short`, a CDS overlap, an integrase shorter than 300 aa, a gapped alignment)
+- `published_coordinates` and `audit` — the full tables, so a rejected locus can be reconstructed without the temporary files
+- `logs` — stdout of the steps that printed something. Empty logs are omitted
+
+If the run crashes, the report is still written from whichever steps finished.
+
+## Putting the files on a strain catalogue
+
+[hotspringslab.ru/en/resources](https://hotspringslab.ru/en/resources) is a catalogue of phages, strains, and protocols. A strain page, for example [TTHB27c](https://hotspringslab.ru/en/resources/strains/TTHB27c), has a Sequences table: file name, kind, version, size. Today that table holds the genome annotation (`TTHB27c_genome.gb.gz`, kind `annotation`). The integrative-element files are another row in that table, not a replacement for the annotation.
+
+1. Run the pipeline on the same nucleotide assembly that the hosted annotation describes. The FASTA record ids become the GFF3 sequence ids. If the site already serves `TTHB27c_genome.gb.gz`, those ids have to be the ids in that file. A GFF3 whose first column is `chromosome00001` will not line up with a GenBank whose locus is named differently.
+2. Check `TTHB27c.ie.report.txt`. Publish the GFF3 and GenBank when the confident rows are the elements you want on the page. Keep the report in the lab record. It is a diagnostic, not a download for the strain page.
+3. Add two files to the strain Sequences table, beside the existing annotation:
+
+   | file | kind |
+   |---|---|
+   | `TTHB27c.ie.gff3` | integrative elements |
+   | `TTHB27c.ie.gbk` | integrative elements |
+
+   Leave the genome annotation row as it is. The catalogue download [sequences.zip](https://hotspringslab.ru/en/resources/strains/sequences.zip) is built from that table, so the new files are included when the table is rebuilt.
+4. The page does not draw a genome browser. The GFF3 is the track file for when a viewer is added: load it on the same assembly, second track, source `IE_finder`. Until then the strain page offers the files as downloads, the same way it offers the genome GenBank.
+
+Do not gzip-replace `TTHB27c_genome.gb.gz` with `TTHB27c.ie.gbk`. The element GenBank contains only the contigs that carry an element, and only the attL, attR, integrase, and element-span features.
