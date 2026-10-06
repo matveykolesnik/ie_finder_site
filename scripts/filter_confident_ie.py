@@ -78,6 +78,7 @@ def filter_sample(
     mge_fa_path: Path,
     mge_gbk_path: Path,
     orfs_gff_path: Path,
+    fasta_path: Path,
     out_fa: Path,
     out_gbk: Path,
     out_audit: Path,
@@ -93,6 +94,7 @@ def filter_sample(
         mge_fa_path: Path to ``mge_region.fa`` containing candidate elements.
         mge_gbk_path: Path to ``mge_annotated.gbk``.
         orfs_gff_path: Path to Prodigal ``orfs.gff``.
+        fasta_path: Path to the assembly FASTA. Exact attL runs are read from it.
         out_fa: Output path for ``ie_confident.fa``.
         out_gbk: Output path for ``ie_confident.gbk``.
         out_audit: Output path for ``ie_filter_audit.tsv``.
@@ -124,6 +126,12 @@ def filter_sample(
             sites = sites_df.drop_duplicates("integrase_id").set_index("integrase_id").to_dict("index")
 
     cds_by_contig = parse_orfs_gff(orfs_gff_path)
+    contig_seqs: dict[str, str] = {}
+    if fasta_path.is_file() and fasta_path.stat().st_size > 0:
+        contig_seqs = {
+            rec.id: str(rec.seq).upper()
+            for rec in SeqIO.parse(fasta_path, "fasta")
+        }
     audit_rows: list[dict] = []
 
     if trna_df.empty:
@@ -164,6 +172,12 @@ def filter_sample(
                 raw_hits = pd.DataFrame()
 
         ie_id = next((k for k in ie_lengths if k.split(":")[0] == integrase_id), None)
+        contig_seq = contig_seqs.get(contig, "")
+        if not contig_seq:
+            for key, val in contig_seqs.items():
+                if contig in key or key in contig:
+                    contig_seq = val
+                    break
         attl_seq = trna_seq = ""
         site = sites.get(integrase_id)
         if site is not None and ie_id in ie_seqs:
@@ -185,6 +199,7 @@ def filter_sample(
             raw_hits=raw_hits,
             attl_seq=attl_seq,
             trna_seq=trna_seq,
+            contig_seq=contig_seq,
             cds_by_contig=cds_by_contig,
             thresholds=thresholds,
         )
@@ -237,6 +252,7 @@ def main() -> None:
     parser.add_argument("--mge-fa", required=True, help="Path to mge_region.fa.")
     parser.add_argument("--mge-gbk", required=True, help="Path to mge_annotated.gbk.")
     parser.add_argument("--orfs-gff", required=True, help="Path to orfs.gff.")
+    parser.add_argument("--fasta", required=True, help="Path to the assembly FASTA.")
     parser.add_argument("--config", default="ie_finder_config.yaml", help="Pipeline config.")
     parser.add_argument("--out-fa", required=True, help="Output ie_confident.fa path.")
     parser.add_argument("--out-gbk", required=True, help="Output ie_confident.gbk path.")
@@ -252,6 +268,7 @@ def main() -> None:
         mge_fa_path=Path(args.mge_fa),
         mge_gbk_path=Path(args.mge_gbk),
         orfs_gff_path=Path(args.orfs_gff),
+        fasta_path=Path(args.fasta),
         out_fa=Path(args.out_fa),
         out_gbk=Path(args.out_gbk),
         out_audit=Path(args.out_audit),

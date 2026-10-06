@@ -216,12 +216,13 @@ def build_elements(
                 int_start, int_end = ordered_span(int_start_raw, int_end_raw)
             if "strand" in hit.index:
                 int_strand = gff_strand(hit["strand"])
-        span = span_from_ie_id(row.get("ie_id", ""))
-        if span is None:
-            bounds = [attl_start, attl_end, attr_start, attr_end]
-            if int_start is not None and int_end is not None:
-                bounds.extend([int_start, int_end])
-            span = (min(bounds), max(bounds))
+        bounds = [attl_start, attl_end, attr_start, attr_end]
+        if int_start is not None and int_end is not None:
+            bounds.extend([int_start, int_end])
+        island = span_from_ie_id(row.get("ie_id", ""))
+        if island is not None:
+            bounds.extend(island)
+        span = (min(bounds), max(bounds))
         passed = "passed_confident" in row.index and as_bool(row["passed_confident"])
         elements.append({
             "sample": sample,

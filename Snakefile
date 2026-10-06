@@ -222,6 +222,7 @@ rule filter_confident_ie:
         mge_fa=os.path.join(RESULTS_DIR, "{sample}", "mge_region.fa"),
         mge_gbk=os.path.join(RESULTS_DIR, "{sample}", "mge_annotated.gbk"),
         orfs_gff=os.path.join(RESULTS_DIR, "{sample}", "orfs.gff"),
+        fasta=os.path.join(GENOMES_DIR, "{sample}.fna"),
         config=config["paths"].get("config_file", "ie_finder_config.yaml"),
     output:
         fa=os.path.join(RESULTS_DIR, "{sample}", "ie_confident.fa"),
@@ -241,6 +242,7 @@ rule filter_confident_ie:
             --mge-fa {input.mge_fa} \
             --mge-gbk {input.mge_gbk} \
             --orfs-gff {input.orfs_gff} \
+            --fasta {input.fasta} \
             --config {input.config} \
             --out-fa {output.fa} \
             --out-gbk {output.gbk} \

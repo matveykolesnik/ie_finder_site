@@ -306,6 +306,7 @@ def evaluate_ie_candidate(
     raw_hits: pd.DataFrame | None,
     attl_seq: str = "",
     trna_seq: str = "",
+    contig_seq: str = "",
     cds_by_contig: dict[str, list[tuple[int, int, str, str]]],
     thresholds: FilterThresholds,
 ) -> dict[str, Any]:
@@ -359,6 +360,18 @@ def evaluate_ie_candidate(
         return row
     row.update(chosen)
     row["candidate_attl_len_bp"] = chosen["best_attl_len_bp"]
+    # The cut-out island does not always contain the BLAST hit: on a minus-strand
+    # tRNA the extract starts at hit_end, so the first bases are not attL.
+    # Measure the repeat on the assembly instead.
+    if contig_seq:
+        lo, hi = int(chosen["attL_abs_lo"]), int(chosen["attL_abs_hi"])
+        if 1 <= lo <= hi <= len(contig_seq):
+            attl_seq = contig_seq[lo - 1:hi]
+        ts, te = int(trna_start), int(trna_end)
+        if ts > te:
+            ts, te = te, ts
+        if 1 <= ts <= te <= len(contig_seq):
+            trna_seq = contig_seq[ts - 1:te]
     exact = exact_anchored_run(attl_seq, trna_seq, trna_strand, thresholds.shift) if attl_seq and trna_seq else 0
     row["exact_anchored_bp"] = exact
 
