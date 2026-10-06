@@ -10,18 +10,45 @@ A confident element is a phage-type tyrosine integrase next to an opposite-stran
 
 ## Requirements
 
-Linux, and either:
-
-- Prodigal, HMMER (`hmmscan`), Aragorn, BLAST+ (`makeblastdb`, `blastn`), Snakemake, and Python 3.10 with Biopython, pandas, and PyYAML, or
-- a conda/mamba install, in which case `USE_CONDA=1` builds `envs/IE_finder.yaml` on the first run.
-
-Snakemake has to be on `PATH` before `USE_CONDA=1` can create the tool environment.
+Linux and a conda install (Miniforge or Miniconda). The pipeline calls Snakemake, Python 3 with PyYAML, Prodigal, HMMER (`hmmscan`), Aragorn, and BLAST+ (`makeblastdb`, `blastn`). Those programs come from `envs/IE_finder.yaml`. `./run.sh` stops if they are not on `PATH`.
 
 ## Install
 
 ```bash
 git clone https://github.com/rljech13/ie_finder_site.git
 cd ie_finder_site
+```
+
+## Build the environment
+
+Create the environment once, from the repository root. The name in the yaml is `IE_finder_site`.
+
+```bash
+conda env create -f envs/IE_finder.yaml
+```
+
+If `conda` itself is missing, install Miniforge, then create the environment. On x86_64 Linux:
+
+```bash
+curl -L -o Miniforge3.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3.sh -b -p "$HOME/miniforge3"
+source "$HOME/miniforge3/etc/profile.d/conda.sh"
+conda env create -f envs/IE_finder.yaml
+```
+
+Other CPU architectures use the matching installer from the [Miniforge releases](https://github.com/conda-forge/miniforge/releases). `conda init bash` makes `conda` available in later shells. Otherwise source `etc/profile.d/conda.sh` again in each new shell.
+
+Activate the environment before every run. Activation puts `snakemake`, `prodigal`, `hmmscan`, `aragorn`, `blastn`, and `python3` on `PATH`.
+
+```bash
+conda activate IE_finder_site
+command -v snakemake prodigal hmmscan aragorn blastn python3
+```
+
+After a change to `envs/IE_finder.yaml`:
+
+```bash
+conda env update -f envs/IE_finder.yaml --prune
 ```
 
 ## Run
@@ -61,11 +88,13 @@ Intermediate tables, BLAST output, and the cut-out island sequences are written 
 ## Options
 
 ```bash
+conda activate IE_finder_site
 ANNOTATE_ALL=1 ./run.sh TTHB27c.fasta outdir
 KEEP_WORK=1 ./run.sh TTHB27c.fasta outdir
-USE_CONDA=1 ./run.sh TTHB27c.fasta outdir
 ./run.sh TTHB27c.fasta outdir --cores 8
 ```
+
+`USE_CONDA=1` is the other setup. It needs Snakemake and conda already installed outside `IE_finder_site`. Snakemake then builds a second copy of `envs/IE_finder.yaml` under `~/miniforge3/envs` on the first run (`SNAKEMAKE_CONDA_PREFIX` changes that directory). With `IE_finder_site` activated, run `./run.sh` and leave `USE_CONDA` unset.
 
 `ANNOTATE_ALL=1` also writes candidates that have an attL coordinate but failed a later filter. In the GFF3 and the report their `confidence` is `candidate`.
 
