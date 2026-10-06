@@ -1,0 +1,7 @@
+outdir/
+demo_run/
+.snakemake/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+logs/
