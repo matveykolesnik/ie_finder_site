@@ -2,7 +2,7 @@
 
 A reduced, self-contained copy of the MGE_finder discovery workflow. The integrase HMMs, the search scripts, and the conda environment are in this repository. `UPSTREAM` records which commit of [MGE_finder](https://github.com/rljech13/MGE_finder) the copy was taken from. A checkout of that repository is not required.
 
-The pipeline reads a genome assembly in FASTA and writes attL/attR, the integrase, and the element span in the coordinates of that assembly. The files are meant to sit next to a strain's genome annotation on a catalogue such as the [Resources](https://hotspringslab.ru/en/resources) page of the Laboratory of Molecular Genetics of Microorganisms. That site is the example below. This repository does not upload anything by itself.
+The pipeline reads a genome assembly in FASTA and writes attL/attR, the integrase, and the element span in the coordinates of that assembly.
 
 ## What an element is
 
@@ -83,21 +83,3 @@ Arguments after the output directory are passed to Snakemake.
 - `logs` — stdout of the steps that printed something. Empty logs are omitted
 
 If the run crashes, the report is still written from whichever steps finished.
-
-## Putting the files on a strain catalogue
-
-[hotspringslab.ru/en/resources](https://hotspringslab.ru/en/resources) is a catalogue of phages, strains, and protocols. A strain page, for example [TTHB27c](https://hotspringslab.ru/en/resources/strains/TTHB27c), has a Sequences table: file name, kind, version, size. Today that table holds the genome annotation (`TTHB27c_genome.gb.gz`, kind `annotation`). The integrative-element files are another row in that table, not a replacement for the annotation.
-
-1. Run the pipeline on the same nucleotide assembly that the hosted annotation describes. The FASTA record ids become the GFF3 sequence ids. If the site already serves `TTHB27c_genome.gb.gz`, those ids have to be the ids in that file. A GFF3 whose first column is `chromosome00001` will not line up with a GenBank whose locus is named differently.
-2. Check `TTHB27c.ie.report.txt`. Publish the GFF3 and GenBank when the confident rows are the elements you want on the page. Keep the report in the lab record. It is a diagnostic, not a download for the strain page.
-3. Add two files to the strain Sequences table, beside the existing annotation:
-
-   | file | kind |
-   |---|---|
-   | `TTHB27c.ie.gff3` | integrative elements |
-   | `TTHB27c.ie.gbk` | integrative elements |
-
-   Leave the genome annotation row as it is. The catalogue download [sequences.zip](https://hotspringslab.ru/en/resources/strains/sequences.zip) is built from that table, so the new files are included when the table is rebuilt.
-4. The page does not draw a genome browser. The GFF3 is the track file for when a viewer is added: load it on the same assembly, second track, source `IE_finder`. Until then the strain page offers the files as downloads, the same way it offers the genome GenBank.
-
-Do not gzip-replace `TTHB27c_genome.gb.gz` with `TTHB27c.ie.gbk`. The element GenBank contains only the contigs that carry an element, and only the attL, attR, integrase, and element-span features.
