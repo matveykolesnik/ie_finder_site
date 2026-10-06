@@ -1,18 +1,15 @@
-# Defaults for a checkout that sits next to MGE_finder.
-# run.sh rewrites this from the upstream config and passes the result to Snakemake.
-mge_finder: "../MGE_finder"
-
 paths:
   config_file: "ie_finder_config.yaml"
   genomes_dir: "data/genomes"
   results_dir: "results"
 
 execution:
-  conda_env: "../MGE_finder/envs/IE_finder.yaml"
+  conda_env: "envs/IE_finder.yaml"
 
 annotate:
   all_candidates: false
 
+# Same cascade as MGE_finder at the commit in UPSTREAM, without cohort deduplication.
 filters:
   trna_max_distance_bp: 500
   v3ps_shift: 3
@@ -27,5 +24,5 @@ filters:
 reject_ambiguous_n_ie: false
 
 pfam_profiles:
-  - "../MGE_finder/pfam/PF00589.hmm"
-  - "../MGE_finder/pfam/PF22022.hmm"
+  - "pfam/PF00589.hmm"
+  - "pfam/PF22022.hmm"

@@ -10,8 +10,7 @@ PFAM_LIST = config["pfam_profiles"]
 PFAM_CLI_ARGS = " ".join(f"--pfam '{pfam}'" for pfam in PFAM_LIST)
 ENV = config["execution"]["conda_env"]
 ALL_CANDIDATES = bool(config.get("annotate", {}).get("all_candidates", False))
-# Finder code stays in the main MGE_finder checkout. This file only adds the site export.
-FINDER = os.path.join(os.path.abspath(config["mge_finder"]), "finder_pipeline", "scripts")
+FINDER = os.path.join(workflow.basedir, "scripts")
 
 COMBINED_HMM = os.path.join(RESULTS_DIR, "combined", "pfam_combined.hmm")
 

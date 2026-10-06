@@ -1,11 +1,9 @@
 #!/bin/bash
 # FASTA in, genome-coordinate GFF3 and GenBank out.
-# The search itself is MGE_finder/finder_pipeline. This repo only exports attL/attR
-# onto the assembly and drops the working files.
+# This directory is a reduced copy of the MGE_finder discovery steps and runs on its own.
 #
 #   ./run.sh strain.fasta outdir
 #   ./run.sh genomes_dir outdir
-#   MGE_FINDER=/path/to/MGE_finder ./run.sh strain.fasta outdir
 #   ANNOTATE_ALL=1 ./run.sh strain.fasta outdir
 #   KEEP_WORK=1 ./run.sh strain.fasta outdir
 #
@@ -18,15 +16,7 @@ cd "$SCRIPT_DIR"
 
 if [[ $# -lt 1 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   echo "Usage: ./run.sh genome.fasta|genomes_dir [outdir] [snakemake args...]" >&2
-  echo "       MGE_FINDER=/path/to/MGE_finder ./run.sh genome.fasta outdir" >&2
   exit 2
-fi
-
-MGE_FINDER="$(realpath "${MGE_FINDER:-$SCRIPT_DIR/../MGE_finder}")"
-if [[ ! -f "$MGE_FINDER/finder_pipeline/scripts/predict_orfs.py" ]]; then
-  echo "MGE_finder checkout not found at $MGE_FINDER" >&2
-  echo "Clone https://github.com/rljech13/MGE_finder.git and set MGE_FINDER." >&2
-  exit 1
 fi
 
 INPUT="$(realpath "$1")"
@@ -45,10 +35,7 @@ if [[ ! -e "$INPUT" ]]; then
 fi
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ie_finder_site.XXXXXX")"
-UPSTREAM_COMMIT=""
-if git -C "$MGE_FINDER" rev-parse --short HEAD >/dev/null 2>&1; then
-  UPSTREAM_COMMIT="$(git -C "$MGE_FINDER" rev-parse --short HEAD)"
-fi
+UPSTREAM_COMMIT="$(awk -F': ' '/^commit:/{print $2; exit}' "$SCRIPT_DIR/UPSTREAM")"
 
 write_reports() {
   shopt -s nullglob
@@ -60,7 +47,7 @@ write_reports() {
     python3 "$SCRIPT_DIR/scripts/write_report.py" \
       --sample-dir "$sample_dir" \
       --sample "$sample" \
-      --mge-finder "$MGE_FINDER" \
+      --mge-finder "$SCRIPT_DIR" \
       --upstream-commit "$UPSTREAM_COMMIT" \
       --out "$OUTDIR/${sample}.ie.report.txt" \
       || echo "Could not write a report for $sample" >&2
@@ -123,7 +110,7 @@ fi
 shopt -u nullglob
 
 CONFIG="$WORK/config.yaml"
-python3 - "$MGE_FINDER/finder_pipeline/ie_finder_config.yaml" "$CONFIG" "$MGE_FINDER" "$GENOMES" "$RESULTS" "${ANNOTATE_ALL:-0}" << 'PY'
+python3 - "$SCRIPT_DIR/ie_finder_config.yaml" "$CONFIG" "$SCRIPT_DIR" "$GENOMES" "$RESULTS" "${ANNOTATE_ALL:-0}" << 'PY'
 import sys
 from pathlib import Path
 
@@ -132,20 +119,19 @@ try:
 except ImportError:
     sys.exit("PyYAML is required")
 
-src, dst, mge, genomes, results, annotate_all = sys.argv[1:7]
+src, dst, root, genomes, results, annotate_all = sys.argv[1:7]
 cfg = yaml.safe_load(Path(src).read_text()) or {}
-mge = Path(mge)
-cfg["mge_finder"] = str(mge)
+root = Path(root)
 cfg.setdefault("paths", {})
 cfg["paths"]["config_file"] = dst
 cfg["paths"]["genomes_dir"] = genomes
 cfg["paths"]["results_dir"] = results
 cfg.setdefault("execution", {})
-cfg["execution"]["conda_env"] = str(mge / "envs" / "IE_finder.yaml")
+cfg["execution"]["conda_env"] = str(root / "envs" / "IE_finder.yaml")
 cfg["annotate"] = {"all_candidates": annotate_all == "1"}
 cfg["pfam_profiles"] = [
-    str(mge / "pfam" / "PF00589.hmm"),
-    str(mge / "pfam" / "PF22022.hmm"),
+    str(root / "pfam" / "PF00589.hmm"),
+    str(root / "pfam" / "PF22022.hmm"),
 ]
 Path(dst).write_text(yaml.safe_dump(cfg, sort_keys=False))
 PY

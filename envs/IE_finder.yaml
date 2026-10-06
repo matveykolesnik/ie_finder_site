@@ -1,0 +1,14 @@
+name: IE_finder_site
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python=3.10
+  - biopython
+  - pandas
+  - pyyaml
+  - snakemake
+  - prodigal
+  - hmmer
+  - aragorn
+  - blast

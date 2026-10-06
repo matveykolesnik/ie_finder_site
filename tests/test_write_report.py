@@ -36,6 +36,7 @@ class WriteReportTest(unittest.TestCase):
 
             text = build_report(sample, sample="strain", mge_finder="/mge", upstream_commit="abc")
 
+        self.assertIn("code\t/mge", text)
         self.assertIn("sample\tstrain", text)
         self.assertIn("integrase_hits\t2", text)
         self.assertIn("confident\t1", text)

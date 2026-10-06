@@ -93,7 +93,7 @@ def build_report(
 
     parts = [
         f"sample\t{sample}",
-        f"mge_finder\t{mge_finder}",
+        f"code\t{mge_finder}",
         f"upstream_commit\t{upstream_commit}",
         "",
         "counts",
