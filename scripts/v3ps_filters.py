@@ -16,6 +16,12 @@
 Every candidate gets a full audit row. ``reject_reason`` is the first failing
 step in the order above.
 
+The reported attL is one of the 3'-anchored, strand-consistent BLAST hits in
+the search window. By default it is the hit with the highest bitscore, so a
+long but poor alignment far from the tRNA (often a second copy of the tRNA
+gene) does not win over a shorter, near-perfect repeat. ``attl_select_by:
+length`` restores the published rule, which takes the longest hit.
+
 The exact run is the longest perfect match of the reported attL against the
 tRNA region, starting at the anchored end, with an offset of up to ``shift``
 bases to absorb indels.
@@ -39,6 +45,8 @@ DEFAULT_ATTL_EXACT_MIN_BP = 14
 DEFAULT_ATTL_RELAXED_MIN_BP = 17
 DEFAULT_INTEGRASE_MIN_AA = 300
 DEFAULT_IE_MIN_NT = 0
+DEFAULT_ATTL_SELECT_BY = "bitscore"
+ATTL_SELECT_CHOICES = ("bitscore", "length")
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,9 @@ class FilterThresholds:
         integrase_min_aa: Integrases of this length and shorter are rejected.
         ie_min_nt: Minimum element length in nucleotides; 0 disables the filter.
         reject_ambiguous_n_ie: Reject elements containing ambiguous N bases.
+        attl_select_by: How the reported attL is chosen among anchored hits:
+            ``bitscore`` (best alignment) or ``length`` (longest hit, the
+            published rule).
     """
 
     shift: int = DEFAULT_SHIFT
@@ -70,6 +81,7 @@ class FilterThresholds:
     integrase_min_aa: int = DEFAULT_INTEGRASE_MIN_AA
     ie_min_nt: int = DEFAULT_IE_MIN_NT
     reject_ambiguous_n_ie: bool = False
+    attl_select_by: str = DEFAULT_ATTL_SELECT_BY
 
 
 def load_thresholds(config_path: Path | str | None) -> FilterThresholds:
@@ -82,6 +94,11 @@ def load_thresholds(config_path: Path | str | None) -> FilterThresholds:
     with config_path.open() as fh:
         cfg = yaml.safe_load(fh) or {}
     f = cfg.get("filters", {}) or {}
+    select_by = str(f.get("attl_select_by", DEFAULT_ATTL_SELECT_BY)).strip().lower()
+    if select_by not in ATTL_SELECT_CHOICES:
+        raise ValueError(
+            f"filters.attl_select_by must be one of {ATTL_SELECT_CHOICES}, got {select_by!r}"
+        )
     return FilterThresholds(
         shift=int(f.get("v3ps_shift", DEFAULT_SHIFT)),
         trna_max_distance_bp=int(f.get("trna_max_distance_bp", DEFAULT_TRNA_MAX_DISTANCE_BP)),
@@ -93,6 +110,7 @@ def load_thresholds(config_path: Path | str | None) -> FilterThresholds:
         integrase_min_aa=int(f.get("integrase_min_aa", DEFAULT_INTEGRASE_MIN_AA)),
         ie_min_nt=int(f.get("ie_min_nt", DEFAULT_IE_MIN_NT)),
         reject_ambiguous_n_ie=bool(cfg.get("reject_ambiguous_n_ie", False)),
+        attl_select_by=select_by,
     )
 
 
@@ -206,6 +224,8 @@ def _hit_record(best: pd.Series, n_hits: int, tier: str) -> dict[str, Any]:
         "attL_gapopen": int(best["gapopen_n"]),
         "attL_has_gap": length != qspan or length != sspan,
         "attL_pident": float(best["pident"]) if "pident" in best.index else float("nan"),
+        "attL_bitscore": float(best["bitscore"]) if "bitscore" in best.index else float("nan"),
+        "attL_evalue": float(best["evalue"]) if "evalue" in best.index else float("nan"),
         "attL_tier": tier,
         "n_v3ps_hits": int(n_hits),
         "qstart": int(best["qstart"]),
@@ -219,8 +239,15 @@ def select_v3ps_strict_hit(
     trna_strand: str,
     shift: int = DEFAULT_SHIFT,
     min_len_bp: int = 0,
+    select_by: str = DEFAULT_ATTL_SELECT_BY,
 ) -> dict[str, Any] | None:
-    """Longest 3'-anchored, strand-consistent hit of at least ``min_len_bp`` (any identity)."""
+    """Best 3'-anchored, strand-consistent hit of at least ``min_len_bp`` (any identity).
+
+    ``select_by="bitscore"`` takes the highest bitscore, then the longer hit on a
+    tie. ``select_by="length"`` takes the longest hit, as the published finder did.
+    """
+    if select_by not in ATTL_SELECT_CHOICES:
+        raise ValueError(f"select_by must be one of {ATTL_SELECT_CHOICES}, got {select_by!r}")
     if raw_hits is None or raw_hits.empty:
         return None
     kept = _oriented_anchored(raw_hits, trna_len, trna_strand, shift)
@@ -228,7 +255,13 @@ def select_v3ps_strict_hit(
         kept = kept[kept["length"] >= min_len_bp]
     if kept.empty:
         return None
-    best = kept.loc[kept["length"].idxmax()]
+    if select_by == "length":
+        best = kept.loc[kept["length"].idxmax()]
+    else:
+        ranked = kept.assign(_bits=kept["bitscore"].astype(float)).sort_values(
+            ["_bits", "length"], ascending=False, kind="mergesort"
+        )
+        best = ranked.iloc[0]
     return _hit_record(best, len(kept), "candidate")
 
 
@@ -260,13 +293,18 @@ def select_attl_hit(
     trna_strand: str,
     thresholds: FilterThresholds,
 ) -> dict[str, Any] | None:
-    """Longest 3'-anchored BLAST hit of at least ``attl_candidate_min_bp``.
+    """Best 3'-anchored BLAST hit of at least ``attl_candidate_min_bp``.
 
-    This is the reported attL. The exact run, the length gate and the gap check
-    are all applied to it.
+    This is the reported attL, chosen by ``thresholds.attl_select_by``. The exact
+    run, the length gate and the gap check are all applied to it.
     """
     return select_v3ps_strict_hit(
-        raw_hits, trna_len, trna_strand, thresholds.shift, thresholds.attl_candidate_min_bp
+        raw_hits,
+        trna_len,
+        trna_strand,
+        thresholds.shift,
+        thresholds.attl_candidate_min_bp,
+        thresholds.attl_select_by,
     )
 
 
@@ -333,6 +371,8 @@ def evaluate_ie_candidate(
         "attL_gapopen": 0,
         "attL_has_gap": False,
         "attL_pident": float("nan"),
+        "attL_bitscore": float("nan"),
+        "attL_evalue": float("nan"),
         "attL_tier": "",
         "n_v3ps_hits": 0,
         "prodigal_hit_class": "",
@@ -353,7 +393,7 @@ def evaluate_ie_candidate(
         row["reject_reason"] = "v3ps_no_raw_blast"
         return row
 
-    # Reported attL: longest 3'-anchored BLAST hit of at least 8 bp.
+    # Reported attL: best 3'-anchored BLAST hit of at least 8 bp (see attl_select_by).
     chosen = select_attl_hit(raw_hits, trna_len, trna_strand, thresholds)
     if chosen is None:
         row["reject_reason"] = "v3ps_no_strict_hit"

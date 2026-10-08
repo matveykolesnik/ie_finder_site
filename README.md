@@ -6,7 +6,7 @@ The pipeline reads a genome assembly in FASTA and writes attL/attR, the integras
 
 ## What an element is
 
-A confident element is a phage-type tyrosine integrase next to an opposite-strand tRNA, with a direct repeat of that tRNA 3′ end. The integrase is longer than 300 aa, attL does not overlap a CDS, and the repeat is either an exact run of at least 14 bp or a BLAST hit of at least 17 bp without alignment gaps. Those thresholds are `filters` in `ie_finder_config.yaml`. Cohort deduplication from the main repository is not part of this copy.
+A confident element is a phage-type tyrosine integrase next to an opposite-strand tRNA, with a direct repeat of that tRNA 3′ end. The integrase is longer than 300 aa, attL does not overlap a CDS, and the repeat is either an exact run of at least 14 bp or a BLAST hit of at least 17 bp without alignment gaps. Among the BLAST hits anchored at the tRNA 3′ end, attL is the one with the highest bitscore, so a long but poor match far from the tRNA does not win over a near-perfect repeat. Setting `attl_select_by: length` takes the longest hit instead, as the published finder did. Those thresholds are `filters` in `ie_finder_config.yaml`. Cohort deduplication from the main repository is not part of this copy.
 
 ## Requirements
 
