@@ -21,8 +21,6 @@ STEP_LOGS = (
     "trna_proximity.log",
     "extract_trna_region.log",
     "blast_mge.log",
-    "extract_mge_region.log",
-    "annotate_mge.log",
     "filter_confident_ie.log",
     "export_genome_features.log",
 )
@@ -107,11 +105,12 @@ def build_report(
     """
     integrases = _rows(sample_dir / "integrase_hits_summary.tsv")
     trna = _rows(sample_dir / "integrase_trna.tsv")
-    blast = _rows(sample_dir / "mge_blast.tsv")
     audit = _rows(sample_dir / "ie_filter_audit.tsv")
     sites = _rows(sample_dir / "attachment_sites_genome.tsv")
     n_pass = sum(1 for row in audit if _passed(row.get("passed_confident", "")))
     n_fail = len(audit) - n_pass
+    # Candidates with an attL hit carry its coordinate; the others have 0 or nothing.
+    n_attl = sum(1 for row in audit if row.get("attL_abs_lo", "").strip() not in {"", "0"})
 
     parts = [
         f"sample\t{sample}",
@@ -126,7 +125,7 @@ def build_report(
         "counts",
         f"integrase_hits\t{len(integrases)}",
         f"trna_pairs\t{len(trna)}",
-        f"attL_blast_hits\t{len(blast)}",
+        f"attL_blast_hits\t{n_attl}",
         f"audit_rows\t{len(audit)}",
         f"confident\t{n_pass}",
         f"rejected\t{n_fail}",
