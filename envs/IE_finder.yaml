@@ -1,4 +1,4 @@
-# Versions are pinned: Prodigal, HMMER, Aragorn and BLAST+ decide which
+# Versions are pinned: pyrodigal, HMMER, Aragorn and BLAST+ decide which
 # elements are found, so a rebuild must not pick up newer ones silently.
 name: IE_finder_site
 channels:
@@ -9,7 +9,7 @@ dependencies:
   - biopython=1.88
   - pandas=2.3.3
   - pyyaml=6.0.3
-  - prodigal=2.6.3
+  - pyrodigal=3.7.1
   - hmmer=3.4
   - aragorn=1.2.41
   - blast=2.17.0

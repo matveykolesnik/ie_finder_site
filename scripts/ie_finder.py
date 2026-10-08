@@ -39,7 +39,7 @@ from extract_trna_region import extract_trna_sequence
 from filter_confident_ie import filter_sample
 from hmm_search import parse_faa, parse_gff, parse_tblout, run_hmmsearch, write_outputs
 from merge_search_params import merge_search_params
-from predict_orfs import predict_with_prodigal
+from predict_orfs import predict_orfs
 from v3ps_filters import FilterThresholds, thresholds_to_params
 from write_report import write_report
 
@@ -167,7 +167,7 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
     out.mkdir(parents=True, exist_ok=True)
     t = run.thresholds
     gff, faa = out / "orfs.gff", out / "orfs.faa"
-    step(sample, out, "predict_orfs", predict_with_prodigal,
+    step(sample, out, "predict_orfs", predict_orfs,
          str(fasta), str(gff), str(out / "orfs.ffn"), str(faa))
     step(sample, out, "hmm_search", find_integrases, faa, gff, run.hmm, out, t.integrase_hmm_cutoff)
     step(sample, out, "predict_trna", predict_trnas, fasta, out / "trna.tsv")

@@ -98,7 +98,7 @@ ensure_runtime() {
     echo "Building conda environment $name from envs/IE_finder.yaml" >&2
     "$conda_bin" env create -f "$env_file"
     echo "$want" > "$stamp"
-  elif [[ "$(cat "$stamp" 2>/dev/null)" != "$want" || ! -x "$prefix/bin/python3" || ! -x "$prefix/bin/prodigal" || ! -x "$prefix/bin/hmmsearch" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
+  elif [[ "$(cat "$stamp" 2>/dev/null)" != "$want" || ! -x "$prefix/bin/python3" || ! -x "$prefix/bin/hmmsearch" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
     echo "Updating conda environment $name to match envs/IE_finder.yaml" >&2
     "$conda_bin" env update -p "$prefix" -f "$env_file" --prune
     echo "$want" > "$stamp"

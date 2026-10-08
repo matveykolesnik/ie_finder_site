@@ -10,7 +10,7 @@ A confident element is a phage-type tyrosine integrase next to an opposite-stran
 
 ## Requirements
 
-Linux. The first `./run.sh` builds the conda environment named in `envs/IE_finder.yaml` (`IE_finder_site`): Python 3.10, Biopython, pandas, PyYAML, Prodigal, HMMER, Aragorn, and BLAST+. Later runs reuse that environment. `run.sh` only sets up that environment; the pipeline itself is `scripts/ie_finder.py`. The first build needs a network connection.
+Linux. The first `./run.sh` builds the conda environment named in `envs/IE_finder.yaml` (`IE_finder_site`): Python 3.10, Biopython, pandas, PyYAML, pyrodigal (Prodigal's gene finder as a Python library), HMMER, Aragorn, and BLAST+. Later runs reuse that environment. `run.sh` only sets up that environment; the pipeline itself is `scripts/ie_finder.py`. The first build needs a network connection.
 
 If `conda` is already installed, the script uses it. Otherwise it installs Miniforge into `~/miniforge3` (`MINIFORGE_ROOT` changes that directory) and creates the environment there.
 
