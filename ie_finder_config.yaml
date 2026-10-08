@@ -10,8 +10,9 @@ annotate:
   all_candidates: false
 
 # Same cascade as MGE_finder at the commit in UPSTREAM, without cohort deduplication,
-# with one departure: attL is the best-scoring BLAST hit rather than the longest.
-# Set attl_select_by: length to reproduce the published rule.
+# with two departures: attL is the best-scoring BLAST hit rather than the longest,
+# and gapped attL alignments are kept. Set attl_select_by: length and
+# attl_reject_gapped: true to reproduce the published rules.
 filters:
   trna_max_distance_bp: 500
   v3ps_shift: 3
@@ -19,7 +20,7 @@ filters:
   attl_candidate_min_bp: 8
   attl_exact_min_bp: 14
   attl_relaxed_min_bp: 17
-  attl_reject_gapped: true
+  attl_reject_gapped: false
   # Which 3'-anchored BLAST hit becomes the attL: "bitscore" (best alignment)
   # or "length" (longest hit, the published rule).
   attl_select_by: bitscore
