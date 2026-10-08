@@ -64,21 +64,21 @@ class SelectAttlHitTest(unittest.TestCase):
 
 
 class LoadThresholdsTest(unittest.TestCase):
-    def _load(self, filters_yaml):
+    def _load(self, params_yaml):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "config.yaml"
-            path.write_text("filters:\n" + filters_yaml)
+            path = Path(tmp) / "search_params.yaml"
+            path.write_text(params_yaml)
             return load_thresholds(path)
 
     def test_default_is_bitscore(self):
-        self.assertEqual(self._load("  v3ps_shift: 3\n").attl_select_by, "bitscore")
+        self.assertEqual(self._load("v3ps_shift: 3\n").attl_select_by, "bitscore")
 
     def test_length_is_read(self):
-        self.assertEqual(self._load("  attl_select_by: length\n").attl_select_by, "length")
+        self.assertEqual(self._load("attl_select_by: length\n").attl_select_by, "length")
 
     def test_unknown_value_is_rejected(self):
         with self.assertRaises(ValueError):
-            self._load("  attl_select_by: longest\n")
+            self._load("attl_select_by: longest\n")
 
 
 if __name__ == "__main__":

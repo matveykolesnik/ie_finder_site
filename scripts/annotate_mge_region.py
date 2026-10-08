@@ -260,9 +260,12 @@ if __name__ == "__main__":
     parser.add_argument("--query", required=True, help="mge_query.fa path.")
     parser.add_argument("--out_tsv", required=True, help="Output mge_blast.tsv path.")
     parser.add_argument("--tmp_dir", default=".", help="Temporary directory for BLAST.")
-    parser.add_argument("--config", default="ie_finder_config.yaml", help="Pipeline config.")
+    parser.add_argument(
+        "--params", "--config", dest="params", default="search_params.yaml",
+        help="Search parameters (search_params.yaml).",
+    )
     cli_args = parser.parse_args()
-    thresholds = load_thresholds(cli_args.config)
+    thresholds = load_thresholds(cli_args.params)
     main(
         cli_args.ffn, cli_args.integrases, cli_args.query, cli_args.out_tsv, cli_args.tmp_dir,
         window_size=thresholds.attl_window_bp,
