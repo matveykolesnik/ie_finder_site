@@ -61,7 +61,6 @@ if [[ -n "${SEARCH_PARAMS:-}" ]]; then
 fi
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ie_finder_site.XXXXXX")"
-# The values this run actually used: search_params.yaml plus SEARCH_PARAMS.
 PARAMS_USED="$WORK/search_params.yaml"
 UPSTREAM_COMMIT="$(awk -F': ' '/^commit:/{print $2; exit}' "$SCRIPT_DIR/UPSTREAM")"
 
@@ -215,50 +214,12 @@ ensure_runtime() {
 
 ensure_runtime
 
-CONFIG="$WORK/config.yaml"
-python3 - "$SCRIPT_DIR/ie_finder_config.yaml" "$CONFIG" "$SCRIPT_DIR" "$GENOMES" "$RESULTS" "${ANNOTATE_ALL:-0}" \
-  "$BASE_PARAMS" "$USER_PARAMS" "$PARAMS_USED" << 'PY'
-import sys
-from pathlib import Path
-
-try:
-    import yaml
-except ImportError:
-    sys.exit("PyYAML is required")
-
-src, dst, root, genomes, results, annotate_all, base_params, user_params, params_used = sys.argv[1:10]
-root = Path(root)
-sys.path.insert(0, str(root / "scripts"))
-from v3ps_filters import read_params_file, thresholds_from_params, thresholds_to_params
-
-# Each file is checked on its own so an error names the file it came from.
-try:
-    params = read_params_file(base_params)
-    thresholds_from_params(params, base_params)
-    if user_params:
-        override = read_params_file(user_params)
-        thresholds_from_params(override, user_params)
-        params.update(override)
-    thresholds = thresholds_from_params(params)
-except (OSError, ValueError, yaml.YAMLError) as exc:
-    sys.exit(f"Search parameters: {exc}")
-Path(params_used).write_text(yaml.safe_dump(thresholds_to_params(thresholds), sort_keys=False))
-
-cfg = yaml.safe_load(Path(src).read_text()) or {}
-cfg.setdefault("paths", {})
-cfg["paths"].pop("config_file", None)
-cfg["paths"]["search_params"] = params_used
-cfg["paths"]["genomes_dir"] = genomes
-cfg["paths"]["results_dir"] = results
-cfg.setdefault("execution", {})
-cfg["execution"]["conda_env"] = str(root / "envs" / "IE_finder.yaml")
-cfg["annotate"] = {"all_candidates": annotate_all == "1"}
-cfg["pfam_profiles"] = [
-    str(root / "pfam" / "PF00589.hmm"),
-    str(root / "pfam" / "PF22022.hmm"),
-]
-Path(dst).write_text(yaml.safe_dump(cfg, sort_keys=False))
-PY
+# The values this run uses: search_params.yaml with SEARCH_PARAMS on top.
+merge_args=(--base "$BASE_PARAMS" --out "$PARAMS_USED")
+if [[ -n "$USER_PARAMS" ]]; then
+  merge_args+=(--override "$USER_PARAMS")
+fi
+python3 "$SCRIPT_DIR/scripts/merge_search_params.py" "${merge_args[@]}"
 
 SM="${SNAKEMAKE:-snakemake}"
 if ! command -v "$SM" >/dev/null 2>&1; then
@@ -269,7 +230,11 @@ fi
 PYTHONWARNINGS="${PYTHONWARNINGS:-ignore::FutureWarning}" "$SM" \
   --snakefile "$SCRIPT_DIR/Snakefile" \
   --directory "$WORK" \
-  --configfile "$CONFIG" \
+  --config \
+    genomes_dir="$GENOMES" \
+    results_dir="$RESULTS" \
+    search_params="$PARAMS_USED" \
+    all_candidates="${ANNOTATE_ALL:-0}" \
   --cores "$(nproc)" \
   --printshellcmds \
   --show-failed-logs \

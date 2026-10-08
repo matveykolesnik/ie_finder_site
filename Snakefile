@@ -3,13 +3,15 @@ import glob
 import sys
 
 
-configfile: os.path.join(workflow.basedir, "ie_finder_config.yaml")
-
-GENOMES_DIR = config["paths"]["genomes_dir"]
-RESULTS_DIR = config["paths"]["results_dir"]
-# Relative profile paths are taken from this directory.
-PFAM_LIST = [os.path.join(workflow.basedir, pfam) for pfam in config["pfam_profiles"]]
-ALL_CANDIDATES = bool(config.get("annotate", {}).get("all_candidates", False))
+# run.sh passes these with --config. Run directly, the workflow reads
+# data/genomes/*.fna and writes results/ under the working directory.
+GENOMES_DIR = config.get("genomes_dir", "data/genomes")
+RESULTS_DIR = config.get("results_dir", "results")
+ALL_CANDIDATES = str(config.get("all_candidates", "0")).strip().lower() in {"1", "true", "yes"}
+PFAM_LIST = [
+    os.path.join(workflow.basedir, "pfam", "PF00589.hmm"),
+    os.path.join(workflow.basedir, "pfam", "PF22022.hmm"),
+]
 FINDER = os.path.join(workflow.basedir, "scripts")
 
 sys.path.insert(0, FINDER)
@@ -17,9 +19,7 @@ from v3ps_filters import load_thresholds
 
 # Search thresholds live in their own file. Loading it here stops a run with an
 # unknown key or a bad value before any step starts.
-SEARCH_PARAMS = config["paths"].get(
-    "search_params", os.path.join(workflow.basedir, "search_params.yaml")
-)
+SEARCH_PARAMS = config.get("search_params", os.path.join(workflow.basedir, "search_params.yaml"))
 THRESHOLDS = load_thresholds(SEARCH_PARAMS)
 
 COMBINED_HMM = os.path.join(RESULTS_DIR, "combined", "pfam_combined.hmm")
