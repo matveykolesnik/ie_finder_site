@@ -14,7 +14,18 @@
 
 set -euo pipefail
 
+CALL_DIR="$(pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Relative paths are taken from the directory where the script was started,
+# not from this repository after the cd below.
+abspath() {
+  case "$1" in
+    /*) realpath -m "$1" ;;
+    *) realpath -m "$CALL_DIR/$1" ;;
+  esac
+}
+
 cd "$SCRIPT_DIR"
 
 if [[ $# -lt 1 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -22,10 +33,10 @@ if [[ $# -lt 1 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 2
 fi
 
-INPUT="$(realpath "$1")"
+INPUT="$(abspath "$1")"
 shift
 if [[ $# -ge 1 && "$1" != -* ]]; then
-  OUTDIR="$(realpath -m "$1")"
+  OUTDIR="$(abspath "$1")"
   shift
 else
   OUTDIR="$(realpath -m "$SCRIPT_DIR/outdir")"
