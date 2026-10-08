@@ -22,19 +22,20 @@ from v3ps_filters import (
 logger = get_logger("filter_confident_ie")
 
 
-def integrase_coords(hits_path: Path) -> dict[str, tuple[int, int]]:
-    """Load integrase nucleotide coordinates keyed by ORF identifier.
+def integrase_coords(hits_path: Path) -> dict[str, tuple[int, int, int]]:
+    """Load integrase coordinates and protein length keyed by ORF identifier.
 
     Args:
         hits_path: Path to ``integrase_hits_summary.tsv``.
 
     Returns:
-        Dictionary mapping ``orf_id`` to ``(start, end)`` (1-based inclusive).
+        Dictionary mapping ``orf_id`` to ``(start, end, protein_len_aa)``;
+        coordinates are 1-based inclusive.
     """
     df = pd.read_csv(hits_path, sep="\t")
     out: dict[str, tuple[int, int]] = {}
     for _, row in df.iterrows():
-        out[str(row["orf_id"])] = (int(row["start"]), int(row["end"]))
+        out[str(row["orf_id"])] = (int(row["start"]), int(row["end"]), int(row["protein_len_aa"]))
     return out
 
 
@@ -111,7 +112,7 @@ def filter_sample(
             })
             continue
 
-        int_start, int_end = int_coords[integrase_id]
+        int_start, int_end, int_aa = int_coords[integrase_id]
         qseqid = build_qseqid(integrase_id, contig, trna_start, trna_end, trna_strand)
 
         raw_hits = None
@@ -130,6 +131,7 @@ def filter_sample(
             trna_len=trna_len,
             integrase_start=int_start,
             integrase_end=int_end,
+            integrase_protein_aa=int_aa,
             raw_hits=raw_hits,
             contig_seq=str(contig_record(genome, contig).seq).upper(),
             cds_by_contig=cds_by_contig,

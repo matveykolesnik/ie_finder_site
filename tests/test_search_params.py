@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from v3ps_filters import (
+    integrase_aa_length,
     PARAM_FIELDS,
     FilterThresholds,
     load_thresholds,
@@ -76,6 +77,17 @@ class ParamCheckTest(unittest.TestCase):
         self.assertEqual(load_thresholds(self._write("integrase_hmm_cutoff: none\n")).integrase_hmm_cutoff, "none")
         with self.assertRaisesRegex(ValueError, "integrase_hmm_cutoff must be one of ga, none"):
             load_thresholds(self._write("integrase_hmm_cutoff: tc\n"))
+
+    def test_integrase_length_rule(self):
+        self.assertEqual(load_thresholds(ROOT / "search_params.yaml").integrase_len_from, "protein")
+        self.assertEqual(load_thresholds(self._write("integrase_len_from: span\n")).integrase_len_from, "span")
+        with self.assertRaisesRegex(ValueError, "integrase_len_from must be one of protein, span"):
+            load_thresholds(self._write("integrase_len_from: codons\n"))
+
+    def test_a_300_aa_integrase_passes_only_by_span(self):
+        # 300 residues plus the stop codon: 903 nt.
+        self.assertEqual(integrase_aa_length(1, 903, 300, "protein"), 300)
+        self.assertEqual(integrase_aa_length(1, 903, 300, "span"), 301)
 
     def test_quoted_booleans_are_read(self):
         t = load_thresholds(self._write('attl_reject_gapped: "true"\nreject_ambiguous_n_ie: "no"\n'))

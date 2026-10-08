@@ -101,7 +101,7 @@ def _evaluate(contig_seq: str) -> dict:
     }])
     return evaluate_ie_candidate(
         integrase_id="1_5", contig="1", trna_start=101, trna_end=110, trna_strand="+",
-        trna_len=10, integrase_start=120, integrase_end=165, raw_hits=hits,
+        trna_len=10, integrase_start=120, integrase_end=165, integrase_protein_aa=15, raw_hits=hits,
         contig_seq=contig_seq, cds_by_contig={}, thresholds=FilterThresholds(),
     )
 

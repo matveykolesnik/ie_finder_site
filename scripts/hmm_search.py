@@ -63,37 +63,38 @@ def parse_tblout(tbl_path):
 
 
 def parse_faa(faa_path):
-    """Parse the FAA file to extract ORF coordinates.
+    """ORF coordinates and protein length from a Prodigal FAA file.
 
-    The FAA file header is expected to have the format:
-      >JBKBIM010000001.1_1 # 3 # 1430 # -1 # ID=1_1;partial=10;...
-    The function returns a dictionary mapping the ORF ID to a tuple of (start, end, strand).
+    Headers look like ``>contig_1 # 3 # 1430 # -1 # ID=1_1;partial=10;...``.
+    The protein length counts residues without the trailing ``*`` that marks
+    a stop codon, so a gene cut off at a contig edge is measured correctly too.
 
     Args:
         faa_path (str): Path to the FAA file.
 
     Returns:
-        dict: A dictionary mapping ORF IDs (str) to tuples (start (int), end (int), strand (str)).
+        dict: ORF id -> (start, end, strand, protein length in aa), in file order.
     """
-    orf_coords = {}
-    with open(faa_path, 'r') as f:
+    orfs = {}
+    current = None
+    with open(faa_path) as f:
         for line in f:
             if line.startswith('>'):
-                header = line[1:].strip()
-                parts = header.split(' # ')
+                current = None
+                parts = line[1:].strip().split(' # ')
                 if len(parts) < 4:
                     logger.error(f"Incorrect FAA header format: {line.strip()}")
                     continue
-                orf_id = parts[0]
                 try:
-                    start = int(parts[1])
-                    end = int(parts[2])
+                    start, end = int(parts[1]), int(parts[2])
                 except ValueError:
                     logger.error(f"Error converting coordinates in FAA: {line.strip()}")
                     continue
-                strand = parts[3]
-                orf_coords[orf_id] = (start, end, strand)
-    return orf_coords
+                current = parts[0]
+                orfs[current] = [start, end, parts[3], 0]
+            elif current is not None:
+                orfs[current][3] += len(line.strip().rstrip('*'))
+    return {orf_id: tuple(values) for orf_id, values in orfs.items()}
 
 
 def parse_gff(gff_path):
@@ -128,12 +129,12 @@ def write_outputs(hits, faa_coords, contig_lengths, summary_file, orfs_file):
     """Write the integrase summary and ORF coordinate files, in ORF order.
 
     The summary file has the columns: ORF ID, model accession, start, end,
-    strand, contig ID, contig length, bitscore, E-value. The ORFs file has:
-    ORF ID, start, end.
+    strand, contig ID, contig length, bitscore, E-value, protein length (aa).
+    The ORFs file has: ORF ID, start, end.
 
     Args:
         hits (dict): ORF id -> (model accession, score, E-value).
-        faa_coords (dict): ORF id -> (start, end, strand), in FAA order.
+        faa_coords (dict): ORF id -> (start, end, strand, protein length), in FAA order.
         contig_lengths (dict): Contig id -> contig length.
         summary_file (str): Path to the output summary file.
         orfs_file (str): Path to the output ORFs file.
@@ -142,9 +143,9 @@ def write_outputs(hits, faa_coords, contig_lengths, summary_file, orfs_file):
         if orf_id not in faa_coords:
             logger.error(f"ORF {orf_id} not found in FAA")
     with open(summary_file, 'w') as summ_f, open(orfs_file, 'w') as orfs_f:
-        summ_f.write("orf_id\tmodel_accession\tstart\tend\tstrand\tcontig_id\tcontig_length\tbitscore\tevalue\n")
+        summ_f.write("orf_id\tmodel_accession\tstart\tend\tstrand\tcontig_id\tcontig_length\tbitscore\tevalue\tprotein_len_aa\n")
         orfs_f.write("orf_id\tstart\tend\n")
-        for orf_id, (start, end, strand) in faa_coords.items():
+        for orf_id, (start, end, strand, aa_len) in faa_coords.items():
             if orf_id not in hits:
                 continue
             model, score, evalue = hits[orf_id]
@@ -154,7 +155,7 @@ def write_outputs(hits, faa_coords, contig_lengths, summary_file, orfs_file):
                 logger.error(f"Contig {contig_id} not found in GFF")
                 continue
             contig_len = contig_lengths[contig_id]
-            summ_f.write(f"{orf_id}\t{model}\t{start}\t{end}\t{strand}\t{contig_id}\t{contig_len}\t{score}\t{evalue:g}\n")
+            summ_f.write(f"{orf_id}\t{model}\t{start}\t{end}\t{strand}\t{contig_id}\t{contig_len}\t{score}\t{evalue:g}\t{aa_len}\n")
             orfs_f.write(f"{orf_id}\t{start}\t{end}\n")
     logger.info(f"{len(hits)} integrase hit(s) written to {summary_file}")
 

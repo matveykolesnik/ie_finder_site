@@ -4,7 +4,8 @@
    ``trna_max_distance_bp`` (``annotate_trna_proximity.py``).
 2. Exact duplication of the tRNA 3' end of at least ``attl_candidate_min_bp``
    (perfect run from the 3' anchor).
-3. Integrase longer than ``integrase_min_aa`` amino acids.
+3. Integrase longer than ``integrase_min_aa`` amino acids (measured as
+   ``integrase_len_from`` says).
 4. attL in a non-coding region (no overlap with a Prodigal CDS on the contig).
 5. attL length: exact run of at least ``attl_exact_min_bp``, or the less
    specific search — BLAST length, mismatches allowed — of at least
@@ -50,6 +51,8 @@ DEFAULT_ATTL_SELECT_BY = "bitscore"
 ATTL_SELECT_CHOICES = ("bitscore", "length")
 DEFAULT_INTEGRASE_HMM_CUTOFF = "ga"
 INTEGRASE_HMM_CUTOFF_CHOICES = ("ga", "none")
+DEFAULT_INTEGRASE_LEN_FROM = "protein"
+INTEGRASE_LEN_FROM_CHOICES = ("protein", "span")
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,9 @@ class FilterThresholds:
         attl_reject_gapped: Reject duplications whose alignment length differs
             from the query span or the subject span.
         integrase_min_aa: Integrases of this length and shorter are rejected.
+        integrase_len_from: ``protein`` measures the predicted protein, stop
+            codon not counted; ``span`` divides the nucleotide span by 3, which
+            counts the stop codon, as the published finder did.
         ie_min_nt: Minimum element length in nucleotides; 0 disables the filter.
         reject_ambiguous_n_ie: Reject elements containing ambiguous N bases.
         attl_select_by: How the reported attL is chosen among anchored hits:
@@ -85,6 +91,7 @@ class FilterThresholds:
     attl_relaxed_min_bp: int = DEFAULT_ATTL_RELAXED_MIN_BP
     attl_reject_gapped: bool = False
     integrase_min_aa: int = DEFAULT_INTEGRASE_MIN_AA
+    integrase_len_from: str = DEFAULT_INTEGRASE_LEN_FROM
     ie_min_nt: int = DEFAULT_IE_MIN_NT
     reject_ambiguous_n_ie: bool = False
     attl_select_by: str = DEFAULT_ATTL_SELECT_BY
@@ -103,6 +110,7 @@ PARAM_FIELDS: dict[str, str] = {
     "attl_reject_gapped": "attl_reject_gapped",
     "attl_select_by": "attl_select_by",
     "integrase_min_aa": "integrase_min_aa",
+    "integrase_len_from": "integrase_len_from",
     "ie_min_nt": "ie_min_nt",
     "reject_ambiguous_n_ie": "reject_ambiguous_n_ie",
 }
@@ -110,6 +118,7 @@ _BOOL_PARAMS = {"attl_reject_gapped", "reject_ambiguous_n_ie"}
 _CHOICE_PARAMS = {
     "attl_select_by": ATTL_SELECT_CHOICES,
     "integrase_hmm_cutoff": INTEGRASE_HMM_CUTOFF_CHOICES,
+    "integrase_len_from": INTEGRASE_LEN_FROM_CHOICES,
 }
 
 
@@ -403,12 +412,15 @@ def closest_trna_rows(pairs: pd.DataFrame) -> pd.DataFrame:
     return pairs.loc[pairs.groupby("integrase_id")["distance"].idxmin()]
 
 
-def integrase_aa_length(start: int, end: int) -> int:
-    """Protein length from ORF nucleotide span (1-based inclusive): span // 3.
+def integrase_aa_length(start: int, end: int, protein_aa: int, len_from: str) -> int:
+    """Integrase length in amino acids, as ``integrase_len_from`` defines it.
 
-    The span includes the stop codon, so this is the protein length + 1.
-    Kept as is: the published counts were made with this value.
+    ``protein`` is the length of the predicted protein. ``span`` is the ORF
+    nucleotide span (1-based inclusive) // 3, the published rule; the span
+    includes the stop codon, so that is the protein length + 1.
     """
+    if len_from == "protein":
+        return int(protein_aa)
     return (int(end) - int(start) + 1) // 3
 
 
@@ -433,6 +445,7 @@ def evaluate_ie_candidate(
     trna_len: int,
     integrase_start: int,
     integrase_end: int,
+    integrase_protein_aa: int,
     raw_hits: pd.DataFrame | None,
     contig_seq: str,
     cds_by_contig: dict[str, list[tuple[int, int, str, str]]],
@@ -443,7 +456,9 @@ def evaluate_ie_candidate(
     ``contig_seq`` is the upper-case contig sequence. The attL repeat, the
     element length and the N check are all read from it.
     """
-    aa_len = integrase_aa_length(integrase_start, integrase_end)
+    aa_len = integrase_aa_length(
+        integrase_start, integrase_end, integrase_protein_aa, thresholds.integrase_len_from
+    )
     row: dict[str, Any] = {
         "integrase_id": integrase_id,
         "ie_id": "",

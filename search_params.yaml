@@ -5,9 +5,10 @@
 # An unknown key stops the run. The report lists the values that were used.
 #
 # Same cascade as MGE_finder at the commit in UPSTREAM, without cohort
-# deduplication, with three departures: integrase hits must reach the Pfam
-# gathering threshold, attL is the best-scoring BLAST hit rather than the
-# longest, and gapped attL alignments are kept. Set integrase_hmm_cutoff: none,
+# deduplication, with four departures: integrase hits must reach the Pfam
+# gathering threshold, integrase length leaves out the stop codon, attL is the
+# best-scoring BLAST hit rather than the longest, and gapped attL alignments
+# are kept. Set integrase_hmm_cutoff: none, integrase_len_from: span,
 # attl_select_by: length and attl_reject_gapped: true to reproduce the
 # published rules.
 
@@ -43,6 +44,10 @@ attl_select_by: bitscore
 
 # Integrases of this length (aa) and shorter are rejected.
 integrase_min_aa: 300
+# How integrase length is measured: protein (the predicted protein, stop codon
+# not counted) or span (ORF nucleotide span / 3, which counts the stop codon,
+# as the published finder did).
+integrase_len_from: protein
 
 # Minimum element length (bp). 0 disables the filter.
 ie_min_nt: 0
