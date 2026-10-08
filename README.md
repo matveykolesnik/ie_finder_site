@@ -10,7 +10,7 @@ A confident element is a phage-type tyrosine integrase next to an opposite-stran
 
 ## Requirements
 
-Linux. The first `./run.sh` builds the conda environment named in `envs/IE_finder.yaml` (`IE_finder_site`): Snakemake, Python 3.10, Biopython, pandas, PyYAML, Prodigal, HMMER, Aragorn, and BLAST+. Later runs reuse that environment. The first build needs a network connection.
+Linux. The first `./run.sh` builds the conda environment named in `envs/IE_finder.yaml` (`IE_finder_site`): Python 3.10, Biopython, pandas, PyYAML, Prodigal, HMMER, Aragorn, and BLAST+. Later runs reuse that environment. `run.sh` only sets up that environment; the pipeline itself is `scripts/ie_finder.py`. The first build needs a network connection.
 
 If `conda` is already installed, the script uses it. Otherwise it installs Miniforge into `~/miniforge3` (`MINIFORGE_ROOT` changes that directory) and creates the environment there.
 
@@ -79,7 +79,9 @@ attl_select_by: length
 attl_reject_gapped: true
 ```
 
-Arguments after the output directory are passed to Snakemake.
+`--cores N` sets how many genomes are processed at the same time; the default is one per CPU. Each genome runs its steps in order. Arguments after the input are passed to `scripts/ie_finder.py`, which also takes the options above as `--all-candidates`, `--keep-work` and `--search-params FILE` (see `scripts/ie_finder.py --help`).
+
+If a step fails for one genome, the other genomes still finish and get their files. The failed genome gets a report that shows how far it got, the failing step's log is printed, the temporary directory is kept, and the run exits with status 1.
 
 ## The report
 

@@ -9,7 +9,6 @@ dependencies:
   - biopython=1.88
   - pandas=2.3.3
   - pyyaml=6.0.3
-  - snakemake=7.32.4
   - prodigal=2.6.3
   - hmmer=3.4
   - aragorn=1.2.41

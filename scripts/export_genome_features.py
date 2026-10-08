@@ -11,7 +11,6 @@ also writes candidates that have an attL coordinate but failed a later filter.
 from __future__ import annotations
 
 import argparse
-import logging
 from pathlib import Path
 
 import pandas as pd
@@ -19,7 +18,9 @@ from Bio import SeqIO
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
-logger = logging.getLogger("export_genome_features")
+from logger import get_logger
+
+logger = get_logger("export_genome_features")
 
 SOURCE = "IE_finder"
 TSV_COLUMNS = [
@@ -349,7 +350,6 @@ def export_genome_features(
 
 def main() -> None:
     """Parse arguments and write the three output files."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(
         description="Write attL/attR features in the coordinates of the input assembly"
     )
