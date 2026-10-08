@@ -1,0 +1,18 @@
+##gff-version 3
+##sequence-region 1 1 2113751
+1	IE_finder	mobile_genetic_element	49014	60120	.	.	.	ID=IE1;Name=IE1;integrase_id=1_52;confidence=confident
+1	IE_finder	attachment_site	60070	60120	.	+	.	ID=IE1_attL;Parent=IE1;Note=attL
+1	IE_finder	attachment_site	49014	49090	.	+	.	ID=IE1_attR;Parent=IE1;Note=attR;product=tRNA-Val
+1	IE_finder	CDS	49168	50343	.	-	.	ID=IE1_integrase;Parent=IE1;Note=integrase;product=tyrosine integrase
+1	IE_finder	mobile_genetic_element	664305	671925	.	.	.	ID=IE2;Name=IE2;integrase_id=1_713;confidence=confident
+1	IE_finder	attachment_site	671881	671925	.	+	.	ID=IE2_attL;Parent=IE2;Note=attL
+1	IE_finder	attachment_site	664305	664380	.	+	.	ID=IE2_attR;Parent=IE2;Note=attR;product=tRNA-Ala
+1	IE_finder	CDS	664485	665606	.	-	.	ID=IE2_integrase;Parent=IE2;Note=integrase;product=tyrosine integrase
+1	IE_finder	mobile_genetic_element	956844	968110	.	.	.	ID=IE3;Name=IE3;integrase_id=1_1010;confidence=confident
+1	IE_finder	attachment_site	956844	956889	.	-	.	ID=IE3_attL;Parent=IE3;Note=attL
+1	IE_finder	attachment_site	968035	968110	.	-	.	ID=IE3_attR;Parent=IE3;Note=attR;product=tRNA-Arg
+1	IE_finder	CDS	966805	967959	.	+	.	ID=IE3_integrase;Parent=IE3;Note=integrase;product=tyrosine integrase
+1	IE_finder	mobile_genetic_element	1281076	1325292	.	.	.	ID=IE4;Name=IE4;integrase_id=1_1374;confidence=confident
+1	IE_finder	attachment_site	1281076	1281121	.	-	.	ID=IE4_attL;Parent=IE4;Note=attL
+1	IE_finder	attachment_site	1325218	1325292	.	-	.	ID=IE4_attR;Parent=IE4;Note=attR;product=tRNA-Ala
+1	IE_finder	CDS	1324010	1325155	.	+	.	ID=IE4_integrase;Parent=IE4;Note=integrase;product=tyrosine integrase

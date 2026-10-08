@@ -1,0 +1,10 @@
+##gff-version 3
+##sequence-region NZ_CP053287.1 1 1911458
+NZ_CP053287.1	IE_finder	mobile_genetic_element	652617	663967	.	.	.	ID=IE1;Name=IE1;integrase_id=NZ_CP053287.1_681;confidence=confident
+NZ_CP053287.1	IE_finder	attachment_site	652617	652667	.	-	.	ID=IE1_attL;Parent=IE1;Note=attL
+NZ_CP053287.1	IE_finder	attachment_site	663893	663967	.	-	.	ID=IE1_attR;Parent=IE1;Note=attR;product=tRNA-Val
+NZ_CP053287.1	IE_finder	CDS	662640	663815	.	+	.	ID=IE1_integrase;Parent=IE1;Note=integrase;product=tyrosine integrase
+NZ_CP053287.1	IE_finder	mobile_genetic_element	1795006	1809939	.	.	.	ID=IE2;Name=IE2;integrase_id=NZ_CP053287.1_1896;confidence=confident
+NZ_CP053287.1	IE_finder	attachment_site	1809893	1809939	.	+	.	ID=IE2_attL;Parent=IE2;Note=attL
+NZ_CP053287.1	IE_finder	attachment_site	1795006	1795082	.	+	.	ID=IE2_attR;Parent=IE2;Note=attR;product=tRNA-Ile
+NZ_CP053287.1	IE_finder	CDS	1795160	1796338	.	-	.	ID=IE2_integrase;Parent=IE2;Note=integrase;product=tyrosine integrase
