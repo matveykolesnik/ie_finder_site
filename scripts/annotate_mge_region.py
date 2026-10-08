@@ -12,7 +12,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from logger import Logger
+from logger import get_logger
 from v3ps_filters import (
     DEFAULT_ATTL_CANDIDATE_MIN_BP,
     DEFAULT_ATTL_SELECT_BY,
@@ -22,7 +22,7 @@ from v3ps_filters import (
     select_v3ps_strict_hit,
 )
 
-logger = Logger(name="annotate_mge_region", level=Logger.Level.INFO).get_logger()
+logger = get_logger("annotate_mge_region")
 
 BLAST_COLS = [
     "qseqid", "sseqid", "pident", "length", "mismatch", "gapopen",

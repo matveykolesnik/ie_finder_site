@@ -3,9 +3,9 @@
 import argparse
 import subprocess
 import os
-from logger import Logger
+from logger import get_logger
 
-log = Logger(name="predict_orfs").get_logger()
+log = get_logger("predict_orfs")
 
 
 def predict_with_prodigal(fna_path, gff_path, ffn_path, faa_path):

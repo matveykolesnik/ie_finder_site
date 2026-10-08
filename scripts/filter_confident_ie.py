@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 from Bio import SeqIO
 
-from logger import Logger
+from logger import get_logger
 from sequence_qc import parse_fasta_lengths_and_n_flags
 from v3ps_filters import (
     FilterThresholds,
@@ -19,7 +19,7 @@ from v3ps_filters import (
     parse_orfs_gff,
 )
 
-logger = Logger(name="filter_confident_ie").get_logger()
+logger = get_logger("filter_confident_ie")
 
 
 def closest_trna_rows(trna_path: Path) -> pd.DataFrame:

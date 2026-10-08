@@ -3,7 +3,7 @@ import glob
 import sys
 
 
-configfile: "ie_finder_config.yaml"
+configfile: os.path.join(workflow.basedir, "ie_finder_config.yaml")
 
 GENOMES_DIR = config["paths"]["genomes_dir"]
 RESULTS_DIR = config["paths"]["results_dir"]
@@ -17,7 +17,9 @@ from v3ps_filters import load_thresholds
 
 # Search thresholds live in their own file. Loading it here stops a run with an
 # unknown key or a bad value before any step starts.
-SEARCH_PARAMS = config["paths"].get("search_params", "search_params.yaml")
+SEARCH_PARAMS = config["paths"].get(
+    "search_params", os.path.join(workflow.basedir, "search_params.yaml")
+)
 THRESHOLDS = load_thresholds(SEARCH_PARAMS)
 
 COMBINED_HMM = os.path.join(RESULTS_DIR, "combined", "pfam_combined.hmm")
@@ -175,9 +177,10 @@ rule blast_mge:
         os.path.join(RESULTS_DIR, "{sample}", "blast_mge.log")
     params:
         finder=FINDER,
+        tmp_dir=os.path.join(RESULTS_DIR, "{sample}"),
     shell:
         """
-        python {params.finder}/annotate_mge_region.py --ffn {input.fna} --integrases {input.integrases} --query {input.query} --out_tsv {output.blast_tsv} --tmp_dir . --params {input.search_params} > {log} 2>&1
+        python {params.finder}/annotate_mge_region.py --ffn {input.fna} --integrases {input.integrases} --query {input.query} --out_tsv {output.blast_tsv} --tmp_dir {params.tmp_dir} --params {input.search_params} > {log} 2>&1
         """
 
 rule extract_mge_region:

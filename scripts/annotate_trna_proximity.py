@@ -4,9 +4,9 @@ import argparse
 import csv
 import re
 import subprocess
-from logger import Logger
+from logger import get_logger
 
-logger = Logger(name="trna_proximity", level=Logger.Level.INFO).get_logger()
+logger = get_logger("trna_proximity")
 
 
 def parse_integrases(integrase_file):

@@ -7,9 +7,9 @@ import argparse
 import pandas as pd
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from logger import Logger
+from logger import get_logger
 
-logger = Logger(name="extract_trna_region", level=Logger.Level.INFO).get_logger()
+logger = get_logger("extract_trna_region")
 
 
 def normalize_id(seq_id):

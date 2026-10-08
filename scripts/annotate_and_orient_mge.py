@@ -4,9 +4,9 @@ import argparse
 import pandas as pd
 from Bio import SeqIO
 from Bio.SeqFeature import SeqFeature, FeatureLocation
-from logger import Logger
+from logger import get_logger
 
-logger = Logger(name="annotate_mge", level=Logger.Level.INFO).get_logger()
+logger = get_logger("annotate_mge")
 
 
 def reverse_coords(seq_len: int, start: int, end: int) -> tuple[int, int]:
