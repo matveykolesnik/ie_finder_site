@@ -12,6 +12,8 @@ import argparse
 import csv
 from pathlib import Path
 
+import yaml
+
 STEP_LOGS = (
     "predict_orfs.log",
     "hmm_search.log",
@@ -66,16 +68,17 @@ def _candidate_line(row: dict[str, str]) -> str:
 
 
 def _param_lines(path: Path | None) -> list[str]:
-    """``key<TAB>value`` for each ``key: value`` line of a flat YAML file."""
+    """``key<TAB>value`` for each entry of a flat YAML file."""
     if path is None or not path.is_file():
         return []
+    data = yaml.safe_load(path.read_text(errors="replace")) or {}
+    if not isinstance(data, dict):
+        return []
     lines = []
-    for raw in path.read_text(errors="replace").splitlines():
-        text = raw.split(" #", 1)[0].strip()
-        if not text or text.startswith("#") or ":" not in text:
-            continue
-        key, value = text.split(":", 1)
-        lines.append(f"{key.strip()}\t{value.strip()}")
+    for key, value in data.items():
+        if isinstance(value, bool):
+            value = "true" if value else "false"
+        lines.append(f"{key}\t{value}")
     return lines
 
 

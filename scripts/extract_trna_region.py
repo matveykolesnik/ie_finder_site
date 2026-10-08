@@ -1,7 +1,5 @@
 """Extract tRNA sequences paired with integrases for downstream BLAST."""
 
-"""Extract tRNA sequences paired with integrases for downstream BLAST."""
-
 import os
 import argparse
 import pandas as pd

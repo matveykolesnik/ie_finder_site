@@ -224,8 +224,8 @@ rule annotate_mge:
         """
 
 # Same cascade as the manuscript finder, without the cohort deduplication:
-# exact duplication >= 8 bp, integrase > 300 aa, attL non-coding,
-# exact run >= 14 bp or BLAST length >= 17 bp, no alignment gaps.
+# exact duplication, integrase length, attL non-coding, attL length, and
+# optionally no alignment gaps. Thresholds are in search_params.yaml.
 rule filter_confident_ie:
     input:
         trna=os.path.join(RESULTS_DIR, "{sample}", "integrase_trna.tsv"),

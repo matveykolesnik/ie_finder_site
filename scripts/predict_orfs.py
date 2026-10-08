@@ -64,10 +64,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-else:
-    predict_with_prodigal(
-        snakemake.input.fna,
-        snakemake.output.gff,
-        snakemake.output.ffn,
-        snakemake.output.faa
-    )

@@ -9,9 +9,10 @@
 5. attL length: exact run of at least ``attl_exact_min_bp``, or the less
    specific search — BLAST length, mismatches allowed — of at least
    ``attl_relaxed_min_bp``.
-6. No alignment gaps: the alignment length equals both the query span and the
-   subject span.
-7. Deduplication (``dedup_ie_representatives``).
+6. No alignment gaps, only when ``attl_reject_gapped`` is set: the alignment
+   length equals both the query span and the subject span.
+
+Cohort deduplication from MGE_finder is not part of this copy.
 
 Every candidate gets a full audit row. ``reject_reason`` is the first failing
 step in the order above.

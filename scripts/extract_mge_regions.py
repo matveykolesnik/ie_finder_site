@@ -1,7 +1,5 @@
 """Extract integrative element coordinates from BLAST and tRNA tables."""
 
-"""Extract integrative element coordinates from BLAST and tRNA tables."""
-
 import logging
 import os
 import argparse

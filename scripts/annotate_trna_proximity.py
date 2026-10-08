@@ -249,7 +249,7 @@ def write_results(results, output_file):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Find tRNAs located within 500 nucleotides of integrases"
+        description="Find tRNAs on the opposite strand within --max_distance nt of integrases"
     )
     parser.add_argument("--integrases", required=True,
                         help="TSV file with integrase data (e.g., integrase_hits_summary.tsv)")
