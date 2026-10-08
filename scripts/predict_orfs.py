@@ -3,16 +3,33 @@
 import argparse
 import subprocess
 import os
+
+from Bio import SeqIO
+
 from logger import get_logger
 
 log = get_logger("predict_orfs")
+
+# Prodigal's single mode trains on the input itself and stops with an error
+# below this many bases in total.
+SINGLE_MODE_MIN_BP = 20_000
+
+
+def prodigal_mode(fna_path):
+    """``single`` for an assembly Prodigal can train on, ``meta`` below 20 kb.
+
+    Meta mode uses Prodigal's pre-trained models, so it works on a phage
+    genome or a lone plasmid.
+    """
+    total = sum(len(rec.seq) for rec in SeqIO.parse(fna_path, "fasta"))
+    return "single" if total >= SINGLE_MODE_MIN_BP else "meta"
 
 
 def predict_with_prodigal(fna_path, gff_path, ffn_path, faa_path):
     """Run Prodigal to predict ORFs from a given genome FASTA file.
 
     This function creates the necessary output directories, constructs the command to run
-    Prodigal in single mode, and executes it. It generates three output files:
+    Prodigal in single mode (meta mode for inputs under 20 kb), and executes it. It generates three output files:
     a GFF file for gene annotations, an FFN file for nucleotide sequences, and an FAA file for protein sequences.
 
     Args:
@@ -28,6 +45,12 @@ def predict_with_prodigal(fna_path, gff_path, ffn_path, faa_path):
     os.makedirs(os.path.dirname(ffn_path), exist_ok=True)
     os.makedirs(os.path.dirname(faa_path), exist_ok=True)
 
+    mode = prodigal_mode(fna_path)
+    if mode == "meta":
+        log.warning(
+            f"{fna_path} has fewer than {SINGLE_MODE_MIN_BP} bp, too little for Prodigal "
+            "to train on; using its metagenomic mode"
+        )
     cmd = [
         "prodigal",
         "-i", fna_path,
@@ -35,7 +58,7 @@ def predict_with_prodigal(fna_path, gff_path, ffn_path, faa_path):
         "-d", ffn_path,
         "-a", faa_path,
         "-f", "gff",
-        "-p", "single"
+        "-p", mode,
     ]
 
     log.info(f"Running Prodigal:\n{' '.join(cmd)}")
