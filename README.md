@@ -64,7 +64,7 @@ SEARCH_PARAMS=strict.yaml ./run.sh TTHB27c.fasta outdir
 ./run.sh TTHB27c.fasta outdir --cores 8
 ```
 
-No activation step. `./run.sh` puts `IE_finder_site` on `PATH` for that run. After a change to `envs/IE_finder.yaml`, delete the environment (`conda env remove -n IE_finder_site`) and run again. The script rebuilds it.
+No activation step. `./run.sh` puts `IE_finder_site` on `PATH` for that run. After a change to `envs/IE_finder.yaml`, the next run updates the environment to match. The environment keeps a checksum of the file it was built from.
 
 `ANNOTATE_ALL=1` also writes candidates that have an attL coordinate but failed a later filter. In the GFF3 and the report their `confidence` is `candidate`.
 

@@ -189,20 +189,26 @@ install_miniforge() {
 }
 
 ensure_runtime() {
-  local conda_bin base name prefix
+  local conda_bin base name prefix env_file stamp want
   if ! conda_bin="$(find_conda)"; then
     conda_bin="$(install_miniforge)"
   fi
-  name="$(awk '/^name:/{print $2; exit}' "$SCRIPT_DIR/envs/IE_finder.yaml")"
+  env_file="$SCRIPT_DIR/envs/IE_finder.yaml"
+  name="$(awk '/^name:/{print $2; exit}' "$env_file")"
   base="$("$conda_bin" info --base)"
   prefix="$base/envs/$name"
-  if [[ ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/prodigal" || ! -x "$prefix/bin/hmmsearch" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
+  # The environment records the checksum of the file it was built from, so
+  # an edit to envs/IE_finder.yaml (a new pin, say) triggers an update.
+  stamp="$prefix/.ie_finder_site_env.sha256"
+  want="$(sha256sum "$env_file" | cut -d' ' -f1)"
+  if [[ ! -d "$prefix" ]]; then
     echo "Building conda environment $name from envs/IE_finder.yaml" >&2
-    if [[ -d "$prefix" ]]; then
-      "$conda_bin" env update -p "$prefix" -f "$SCRIPT_DIR/envs/IE_finder.yaml"
-    else
-      "$conda_bin" env create -f "$SCRIPT_DIR/envs/IE_finder.yaml"
-    fi
+    "$conda_bin" env create -f "$env_file"
+    echo "$want" > "$stamp"
+  elif [[ "$(cat "$stamp" 2>/dev/null)" != "$want" || ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/prodigal" || ! -x "$prefix/bin/hmmsearch" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
+    echo "Updating conda environment $name to match envs/IE_finder.yaml" >&2
+    "$conda_bin" env update -p "$prefix" -f "$env_file" --prune
+    echo "$want" > "$stamp"
   fi
   if [[ ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/python3" ]]; then
     echo "Environment $name has no snakemake after creation: $prefix" >&2
