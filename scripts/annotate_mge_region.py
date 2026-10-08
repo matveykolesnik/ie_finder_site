@@ -40,7 +40,7 @@ def run_blast_on_region(
     Args:
         query_rec: tRNA query sequence record.
         subject_seq: Genomic window sequence.
-        tmp_dir: Directory for temporary BLAST database files.
+        tmp_dir: Directory for the temporary query, subject and output files.
 
     Returns:
         BLAST hits as a DataFrame with columns listed in ``BLAST_COLS``.
@@ -55,14 +55,8 @@ def run_blast_on_region(
         SeqIO.write([SeqRecord(subject_seq, id="subject", description="")], sfa, "fasta")
 
         subprocess.run(
-            ["makeblastdb", "-in", sfa, "-dbtype", "nucl"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        subprocess.run(
             [
-                "blastn", "-query", qfa, "-db", sfa,
+                "blastn", "-query", qfa, "-subject", sfa,
                 "-outfmt", f"6 {' '.join(BLAST_COLS)}",
                 "-word_size", "4", "-dust", "no",
                 "-out", bout,
