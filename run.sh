@@ -197,7 +197,7 @@ ensure_runtime() {
   name="$(awk '/^name:/{print $2; exit}' "$SCRIPT_DIR/envs/IE_finder.yaml")"
   base="$("$conda_bin" info --base)"
   prefix="$base/envs/$name"
-  if [[ ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/prodigal" || ! -x "$prefix/bin/hmmscan" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
+  if [[ ! -x "$prefix/bin/snakemake" || ! -x "$prefix/bin/prodigal" || ! -x "$prefix/bin/hmmsearch" || ! -x "$prefix/bin/aragorn" || ! -x "$prefix/bin/blastn" ]]; then
     echo "Building conda environment $name from envs/IE_finder.yaml" >&2
     if [[ -d "$prefix" ]]; then
       "$conda_bin" env update -p "$prefix" -f "$SCRIPT_DIR/envs/IE_finder.yaml"

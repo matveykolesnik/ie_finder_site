@@ -1,116 +1,65 @@
-"""Run HMMER integrase screening and merge hits with ORF coordinates."""
+"""Search the ORFs for tyrosine integrases with HMMER and add their coordinates."""
 
-import os
+import argparse
 import re
 import subprocess
-import argparse
-from datetime import datetime
-from pathlib import Path
+
 from logger import get_logger
 
 logger = get_logger("hmm_search")
 
-
-HMMSCAN_LONG_SEQ_MSG = "Target sequence length > 100K"
-
-
-def append_skip_log(skip_log, sample, reason, details=""):
-    """Append one skip event to a tab-separated log file.
-
-    Args:
-        skip_log: Path to the skip log file, or None to disable logging.
-        sample: Sample identifier associated with the skip event.
-        reason: Short machine-readable skip reason code.
-        details: Optional free-text details.
-    """
-    if not skip_log:
-        return
-    Path(skip_log).parent.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().isoformat()
-    with open(skip_log, "a") as log_f:
-        log_f.write(f"{timestamp}\t{sample}\t{reason}\t{details}\n")
+CUTOFF_FLAGS = {"ga": ["--cut_ga"], "none": []}
+"""hmmsearch flags per ``integrase_hmm_cutoff``. ``none`` keeps HMMER's
+reporting threshold (E-value 10), as the published finder did."""
 
 
-def run_hmmscan(faa_path, hmm_path, output_tbl, sample=None, skip_log=None):
-    """Run hmmscan against a combined Pfam HMM database.
+def run_hmmsearch(faa_path, hmm_path, output_tbl, cutoff="ga"):
+    """Search every ORF against the integrase profiles, writing ``--tblout``.
 
     Args:
         faa_path: Path to the protein FASTA file (``orfs.faa``).
-        hmm_path: Path to the pressed combined HMM file.
-        output_tbl: Path for hmmscan tabular output (tblout format).
-        sample: Optional sample name used in log messages.
-        skip_log: Optional path for recording skipped samples.
-
-    Returns:
-        Tuple ``(success, skip_reason)`` where ``success`` is True when hmmscan
-        completed normally and ``skip_reason`` is a reason code when skipped.
+        hmm_path: Path to the HMM file; it may hold several profiles.
+        output_tbl: Path for the per-sequence table.
+        cutoff: ``ga`` applies each profile's Pfam gathering threshold;
+            ``none`` reports every hit with E-value up to 10.
 
     Raises:
-        subprocess.CalledProcessError: When hmmscan fails for a reason other
-            than exceeding the 100 K amino-acid target limit.
+        subprocess.CalledProcessError: When hmmsearch fails.
     """
-    logger.info(f"Executing hmmscan for {faa_path} using {hmm_path}...")
+    # E-values scale with the search space. hmmscan, which the published finder
+    # ran, counts the profiles; hmmsearch counts the ORFs. -Z keeps the old
+    # E-values, so cutoff "none" reports the same hits as before.
+    n_profiles = sum(1 for line in open(hmm_path) if line.startswith("NAME "))
     cmd = [
-        "hmmscan",
-        "--tblout", output_tbl,
-        hmm_path,
-        faa_path
+        "hmmsearch", *CUTOFF_FLAGS[cutoff], "-Z", str(n_profiles),
+        "--noali", "--tblout", output_tbl, hmm_path, faa_path,
     ]
-    result = subprocess.run(
-        cmd,
-        text=True,
-        capture_output=True
-    )
-    if result.returncode != 0:
-        stderr = result.stderr or ""
-        if HMMSCAN_LONG_SEQ_MSG in stderr:
-            reason = "hmmscan_target_gt_100k"
-            logger.warning(
-                f"hmmscan aborted for {sample or faa_path}: "
-                f"{HMMSCAN_LONG_SEQ_MSG}. Skipping sample."
-            )
-            append_skip_log(skip_log, sample or Path(faa_path).stem, reason, HMMSCAN_LONG_SEQ_MSG)
-            # Write note to tblout to avoid downstream FileNotFoundError
-            Path(output_tbl).write_text(
-                f"# Skipped hmmscan for {sample or faa_path}: {HMMSCAN_LONG_SEQ_MSG}\n"
-            )
-            return False, reason
-        else:
-            logger.error(
-                f"hmmscan failed for {sample or faa_path} with return code {result.returncode}."
-            )
-            logger.error(stderr)
-            result.check_returncode()
-    logger.info(f"Results saved in {output_tbl}")
-    return True, None
+    logger.info(f"Running {' '.join(cmd)}")
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
 
 
 def parse_tblout(tbl_path):
-    """Parse the tblout file and create a mapping from ORF ID to model accession.
+    """Best-scoring profile for each ORF in an ``hmmsearch --tblout`` table.
 
-    The tblout file (e.g., integrase_hits.txt) is expected to have lines in the format:
-      [Some header text]
-      Phage_integrase      PF00589.27 JBKBIM010000027.1_8  - 4.5e-35 108.1 ...
-    where the query name (ORF ID) is the third column and the model accession is the second column.
-
-    Args:
-        tbl_path (str): Path to the tblout file.
+    Columns are: target (ORF id), target accession, query (profile name),
+    query accession, full-sequence E-value, score, ...
 
     Returns:
-        dict: A dictionary mapping ORF IDs (str) to model accessions (str).
+        dict: ORF id -> (profile accession, score, E-value) of its best hit.
     """
-    mapping = {}
-    with open(tbl_path, 'r') as f:
+    best = {}
+    with open(tbl_path) as f:
         for line in f:
             if line.startswith("#"):
                 continue
-            parts = line.strip().split()
-            if len(parts) < 3:
+            parts = line.split()
+            if len(parts) < 6:
                 continue
-            orf_id = parts[2]
-            model_acc = parts[1]
-            mapping[orf_id] = model_acc
-    return mapping
+            orf_id, model_acc = parts[0], parts[3]
+            evalue, score = float(parts[4]), float(parts[5])
+            if orf_id not in best or score > best[orf_id][1]:
+                best[orf_id] = (model_acc, score, evalue)
+    return best
 
 
 def parse_faa(faa_path):
@@ -175,81 +124,62 @@ def parse_gff(gff_path):
     return contig_lengths
 
 
-def write_outputs(mapping, faa_coords, contig_lengths, summary_file, orfs_file):
-    """Write the integrase summary and ORF coordinate files.
+def write_outputs(hits, faa_coords, contig_lengths, summary_file, orfs_file):
+    """Write the integrase summary and ORF coordinate files, in ORF order.
 
-    The summary file contains the following columns:
-      ORF ID, model accession, start, end, strand, contig ID, contig length.
-    The ORFs file contains the following columns:
-      ORF ID, start, end.
+    The summary file has the columns: ORF ID, model accession, start, end,
+    strand, contig ID, contig length, bitscore, E-value. The ORFs file has:
+    ORF ID, start, end.
 
     Args:
-        mapping (dict): Mapping from ORF ID to model accession.
-        faa_coords (dict): Mapping from ORF ID to (start, end, strand).
-        contig_lengths (dict): Mapping from contig ID to contig length.
+        hits (dict): ORF id -> (model accession, score, E-value).
+        faa_coords (dict): ORF id -> (start, end, strand), in FAA order.
+        contig_lengths (dict): Contig id -> contig length.
         summary_file (str): Path to the output summary file.
         orfs_file (str): Path to the output ORFs file.
     """
+    for orf_id in hits:
+        if orf_id not in faa_coords:
+            logger.error(f"ORF {orf_id} not found in FAA")
     with open(summary_file, 'w') as summ_f, open(orfs_file, 'w') as orfs_f:
-        # Write header for summary file
-        summ_f.write("orf_id\tmodel_accession\tstart\tend\tstrand\tcontig_id\tcontig_length\n")
-        # Write header for ORFs file
+        summ_f.write("orf_id\tmodel_accession\tstart\tend\tstrand\tcontig_id\tcontig_length\tbitscore\tevalue\n")
         orfs_f.write("orf_id\tstart\tend\n")
-        for orf_id, model in mapping.items():
-            if orf_id not in faa_coords:
-                logger.error(f"ORF {orf_id} not found in FAA")
+        for orf_id, (start, end, strand) in faa_coords.items():
+            if orf_id not in hits:
                 continue
-            start, end, strand = faa_coords[orf_id]
+            model, score, evalue = hits[orf_id]
             # Contig ID is the ORF ID with the trailing _<orf_index> suffix removed.
             contig_id = '_'.join(orf_id.split('_')[:-1])
             if contig_id not in contig_lengths:
                 logger.error(f"Contig {contig_id} not found in GFF")
                 continue
             contig_len = contig_lengths[contig_id]
-            summ_f.write(f"{orf_id}\t{model}\t{start}\t{end}\t{strand}\t{contig_id}\t{contig_len}\n")
+            summ_f.write(f"{orf_id}\t{model}\t{start}\t{end}\t{strand}\t{contig_id}\t{contig_len}\t{score}\t{evalue:g}\n")
             orfs_f.write(f"{orf_id}\t{start}\t{end}\n")
-    logger.info("Data successfully written to output files.")
+    logger.info(f"{len(hits)} integrase hit(s) written to {summary_file}")
 
 
 def main() -> None:
-    """Run hmmscan and write integrase summary tables for one sample."""
+    """Search one sample's ORFs and write the integrase summary tables."""
     parser = argparse.ArgumentParser(
-        description="Match HMM scan results with ORF and contig data"
+        description="Find integrase ORFs with hmmsearch and add their coordinates"
     )
     parser.add_argument("--faa", required=True, help="Path to FAA file (orfs.faa)")
     parser.add_argument("--gff", required=True, help="Path to GFF file (orfs.gff)")
     parser.add_argument("--out", required=True, help="Path to tblout file (integrase_hits.txt)")
     parser.add_argument("--summary", required=True, help="Output file for integrase summary table")
     parser.add_argument("--orfs", required=True, help="Output file for ORF coordinates")
-    parser.add_argument("--combined", required=True, help="Path to combined HMM file")
-    parser.add_argument("--sample", required=False, help="Sample name (for logging)")
+    parser.add_argument("--hmm", required=True, help="HMM file with the integrase profiles")
     parser.add_argument(
-        "--skip-log",
-        required=False,
-        help="File to append skipped samples (tab-separated timestamp, sample, reason, details)"
+        "--cutoff", choices=sorted(CUTOFF_FLAGS), default="ga",
+        help="ga: Pfam gathering thresholds; none: every hit with E-value up to 10",
     )
     args = parser.parse_args()
 
-    # Step 1: Run hmmscan
-    success, skip_reason = run_hmmscan(
-        args.faa,
-        args.combined,
-        args.out,
-        sample=args.sample,
-        skip_log=args.skip_log
+    run_hmmsearch(args.faa, args.hmm, args.out, args.cutoff)
+    write_outputs(
+        parse_tblout(args.out), parse_faa(args.faa), parse_gff(args.gff), args.summary, args.orfs
     )
-    if not success:
-        # Produce empty outputs so downstream steps continue
-        write_outputs({}, {}, {}, args.summary, args.orfs)
-        return
-    # Step 2: Parse tblout file to get mapping (ORF ID -> model accession)
-    mapping = parse_tblout(args.out)
-    # Step 3: Parse FAA file to get ORF coordinates
-    faa_coords = parse_faa(args.faa)
-    # Step 4: Parse GFF file to get contig lengths
-    contig_lengths = parse_gff(args.gff)
-    # Step 5: Write output summary and ORF coordinate files
-    write_outputs(mapping, faa_coords, contig_lengths, args.summary, args.orfs)
 
 
 if __name__ == "__main__":

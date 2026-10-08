@@ -71,6 +71,12 @@ class ParamCheckTest(unittest.TestCase):
                 load_thresholds(path)
             self.assertIn(str(path), str(ctx.exception))
 
+    def test_integrase_cutoff(self):
+        self.assertEqual(load_thresholds(ROOT / "search_params.yaml").integrase_hmm_cutoff, "ga")
+        self.assertEqual(load_thresholds(self._write("integrase_hmm_cutoff: none\n")).integrase_hmm_cutoff, "none")
+        with self.assertRaisesRegex(ValueError, "integrase_hmm_cutoff must be one of ga, none"):
+            load_thresholds(self._write("integrase_hmm_cutoff: tc\n"))
+
     def test_quoted_booleans_are_read(self):
         t = load_thresholds(self._write('attl_reject_gapped: "true"\nreject_ambiguous_n_ie: "no"\n'))
         self.assertTrue(t.attl_reject_gapped)

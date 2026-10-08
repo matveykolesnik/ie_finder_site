@@ -5,10 +5,16 @@
 # An unknown key stops the run. The report lists the values that were used.
 #
 # Same cascade as MGE_finder at the commit in UPSTREAM, without cohort
-# deduplication, with two departures: attL is the best-scoring BLAST hit
-# rather than the longest, and gapped attL alignments are kept. Set
+# deduplication, with three departures: integrase hits must reach the Pfam
+# gathering threshold, attL is the best-scoring BLAST hit rather than the
+# longest, and gapped attL alignments are kept. Set integrase_hmm_cutoff: none,
 # attl_select_by: length and attl_reject_gapped: true to reproduce the
 # published rules.
+
+# Which HMMER hits count as integrases: ga keeps hits at or above each Pfam
+# profile's gathering threshold; none keeps every hit HMMER reports (E-value up
+# to 10), as the published finder did.
+integrase_hmm_cutoff: ga
 
 # Integrase and tRNA must be on opposite strands with 3' ends at most this far apart (bp).
 trna_max_distance_bp: 500

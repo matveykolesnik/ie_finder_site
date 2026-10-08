@@ -48,6 +48,8 @@ DEFAULT_INTEGRASE_MIN_AA = 300
 DEFAULT_IE_MIN_NT = 0
 DEFAULT_ATTL_SELECT_BY = "bitscore"
 ATTL_SELECT_CHOICES = ("bitscore", "length")
+DEFAULT_INTEGRASE_HMM_CUTOFF = "ga"
+INTEGRASE_HMM_CUTOFF_CHOICES = ("ga", "none")
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,9 @@ class FilterThresholds:
         attl_select_by: How the reported attL is chosen among anchored hits:
             ``bitscore`` (best alignment) or ``length`` (longest hit, the
             published rule).
+        integrase_hmm_cutoff: ``ga`` keeps integrase hits at or above each
+            profile's Pfam gathering threshold; ``none`` keeps every hit HMMER
+            reports (E-value up to 10), as the published finder did.
     """
 
     shift: int = DEFAULT_SHIFT
@@ -83,10 +88,12 @@ class FilterThresholds:
     ie_min_nt: int = DEFAULT_IE_MIN_NT
     reject_ambiguous_n_ie: bool = False
     attl_select_by: str = DEFAULT_ATTL_SELECT_BY
+    integrase_hmm_cutoff: str = DEFAULT_INTEGRASE_HMM_CUTOFF
 
 
 # search_params.yaml key -> FilterThresholds field, in the order of that file.
 PARAM_FIELDS: dict[str, str] = {
+    "integrase_hmm_cutoff": "integrase_hmm_cutoff",
     "trna_max_distance_bp": "trna_max_distance_bp",
     "v3ps_shift": "shift",
     "attl_window_bp": "attl_window_bp",
@@ -100,6 +107,10 @@ PARAM_FIELDS: dict[str, str] = {
     "reject_ambiguous_n_ie": "reject_ambiguous_n_ie",
 }
 _BOOL_PARAMS = {"attl_reject_gapped", "reject_ambiguous_n_ie"}
+_CHOICE_PARAMS = {
+    "attl_select_by": ATTL_SELECT_CHOICES,
+    "integrase_hmm_cutoff": INTEGRASE_HMM_CUTOFF_CHOICES,
+}
 
 
 def _as_bool(key: str, value: Any) -> bool:
@@ -143,12 +154,13 @@ def thresholds_from_params(
         try:
             if key in _BOOL_PARAMS:
                 values[field] = _as_bool(key, value)
-            elif key == "attl_select_by":
-                choice = str(value).strip().lower()
-                if choice not in ATTL_SELECT_CHOICES:
+            elif key in _CHOICE_PARAMS:
+                choices = _CHOICE_PARAMS[key]
+                # YAML reads a bare "none" as a string, but "null" or "~" as None.
+                choice = "none" if value is None else str(value).strip().lower()
+                if choice not in choices:
                     raise ValueError(
-                        f"attl_select_by must be one of {', '.join(ATTL_SELECT_CHOICES)}, "
-                        f"got {value!r}"
+                        f"{key} must be one of {', '.join(choices)}, got {value!r}"
                     )
                 values[field] = choice
             else:

@@ -7,8 +7,8 @@ configfile: os.path.join(workflow.basedir, "ie_finder_config.yaml")
 
 GENOMES_DIR = config["paths"]["genomes_dir"]
 RESULTS_DIR = config["paths"]["results_dir"]
-PFAM_LIST = config["pfam_profiles"]
-PFAM_CLI_ARGS = " ".join(f"--pfam '{pfam}'" for pfam in PFAM_LIST)
+# Relative profile paths are taken from this directory.
+PFAM_LIST = [os.path.join(workflow.basedir, pfam) for pfam in config["pfam_profiles"]]
 ALL_CANDIDATES = bool(config.get("annotate", {}).get("all_candidates", False))
 FINDER = os.path.join(workflow.basedir, "scripts")
 
@@ -78,26 +78,19 @@ rule predict_orfs:
         """
 
 rule build_combined_hmm:
+    input:
+        PFAM_LIST,
     output:
         COMBINED_HMM
-    log:
-        os.path.join(RESULTS_DIR, "combined", "build_combined_hmm.log")
-    params:
-        finder=FINDER,
-        pfam_args=PFAM_CLI_ARGS
     shell:
-        """
-        python {params.finder}/build_combined_hmm.py \
-            --output {output} \
-            --log {log} \
-            {params.pfam_args}
-        """
+        "cat {input} > {output}"
 
 rule hmm_search:
     input:
         faa=os.path.join(RESULTS_DIR, "{sample}", "orfs.faa"),
         gff=os.path.join(RESULTS_DIR, "{sample}", "orfs.gff"),
-        hmm=COMBINED_HMM
+        hmm=COMBINED_HMM,
+        search_params=SEARCH_PARAMS,
     output:
         hits=os.path.join(RESULTS_DIR, "{sample}", "integrase_hits.txt"),
         stats=os.path.join(RESULTS_DIR, "{sample}", "integrase_hits_summary.tsv"),
@@ -106,7 +99,7 @@ rule hmm_search:
         os.path.join(RESULTS_DIR, "{sample}", "hmm_search.log")
     params:
         finder=FINDER,
-        skip_log=os.path.join(RESULTS_DIR, "hmmscan_skipped.tsv")
+        cutoff=THRESHOLDS.integrase_hmm_cutoff,
     shell:
         """
         python {params.finder}/hmm_search.py \
@@ -115,9 +108,8 @@ rule hmm_search:
             --out {output.hits} \
             --summary {output.stats} \
             --orfs {output.orfs} \
-            --combined {input.hmm} \
-            --sample {wildcards.sample} \
-            --skip-log {params.skip_log} \
+            --hmm {input.hmm} \
+            --cutoff {params.cutoff} \
             > {log} 2>&1
         """
 
