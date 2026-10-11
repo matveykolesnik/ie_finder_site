@@ -42,11 +42,11 @@ Accepted suffixes in a directory are `.fna`, `.fa`, `.fasta`, and `.fsa`. Two fi
 
 Coordinates are 1-based and inclusive. They refer to the contigs of the FASTA you passed in. The first column of the GFF3 is that FASTA record id.
 
-Each element has four features:
+Each element has four features. All four are on the strand of the integrase, so attL and attR read opposite the tRNA:
 
 | GFF3 type | GenBank key | meaning |
 |---|---|---|
-| `mobile_genetic_element` | `mobile_element` | span from attR to attL, on the integrase strand |
+| `mobile_genetic_element` | `mobile_element` | span from attR to attL |
 | `attachment_site` with `Note=attR` | `misc_feature` / `attR` | the part of the tRNA, the integration site, that aligns with attL; `product` names the tRNA |
 | `attachment_site` with `Note=attL` | `misc_feature` / `attL` | the direct repeat of the tRNA 3′ end |
 | `CDS` | `CDS` | the tyrosine integrase |

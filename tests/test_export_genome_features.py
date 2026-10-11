@@ -80,7 +80,7 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
                 [
                     ("mobile_genetic_element", 10, 319, "+"),
                     ("attachment_site", 10, 29, "+"),
-                    ("attachment_site", 300, 319, "-"),
+                    ("attachment_site", 300, 319, "+"),
                     ("CDS", 80, 250, "+"),
                 ],
             )

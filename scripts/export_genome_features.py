@@ -193,8 +193,9 @@ def build_elements(
                 int_start, int_end = ordered_span(int_start_raw, int_end_raw)
             if "strand" in hit.index:
                 int_strand = gff_strand(hit["strand"])
-        # The element takes the integrase strand. The integrase always sits
-        # opposite the tRNA, so the tRNA gives the same answer without a hit.
+        # The element and both att sites take the integrase strand. The
+        # integrase always sits opposite the tRNA, so the tRNA gives the same
+        # answer without a hit.
         ie_strand = int_strand
         if ie_strand == ".":
             ie_strand = opposite_strand(gff_strand(row.get("trna_strand", ".")))
@@ -212,10 +213,10 @@ def build_elements(
             "ie_strand": ie_strand,
             "attL_start": attl_start,
             "attL_end": attl_end,
-            "attL_strand": gff_strand(row.get("attL_strand", ".")),
+            "attL_strand": ie_strand,
             "attR_start": attr_start,
             "attR_end": attr_end,
-            "attR_strand": gff_strand(row.get("trna_strand", ".")),
+            "attR_strand": ie_strand,
             "attR_type": trna_types.get((integrase_id, trna_start, trna_end), ""),
             "integrase_start": int_start or 0,
             "integrase_end": int_end or 0,
