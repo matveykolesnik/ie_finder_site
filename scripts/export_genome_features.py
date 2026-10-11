@@ -29,6 +29,7 @@ TSV_COLUMNS = [
     "contig",
     "ie_start",
     "ie_end",
+    "ie_strand",
     "attL_start",
     "attL_end",
     "attL_strand",
@@ -58,6 +59,11 @@ def gff_strand(value: object) -> str:
     if text in {"-", "-1"}:
         return "-"
     return "."
+
+
+def opposite_strand(strand: str) -> str:
+    """The other GFF3 strand; ``.`` stays ``.``."""
+    return {"+": "-", "-": "+"}.get(strand, ".")
 
 
 def strand_int(value: object) -> int | None:
@@ -185,6 +191,11 @@ def build_elements(
                 int_start, int_end = ordered_span(int_start_raw, int_end_raw)
             if "strand" in hit.index:
                 int_strand = gff_strand(hit["strand"])
+        # The element takes the integrase strand. The integrase always sits
+        # opposite the tRNA, so the tRNA gives the same answer without a hit.
+        ie_strand = int_strand
+        if ie_strand == ".":
+            ie_strand = opposite_strand(gff_strand(row.get("trna_strand", ".")))
         bounds = [attl_start, attl_end, attr_start, attr_end]
         if int_start is not None and int_end is not None:
             bounds.extend([int_start, int_end])
@@ -196,6 +207,7 @@ def build_elements(
             "contig": contig,
             "ie_start": span[0],
             "ie_end": span[1],
+            "ie_strand": ie_strand,
             "attL_start": attl_start,
             "attL_end": attl_end,
             "attL_strand": gff_strand(row.get("attL_strand", ".")),
@@ -237,7 +249,7 @@ def write_gff3(path: Path, elements: list[dict], records: dict[str, SeqRecord]) 
         )
         lines.append(_gff_line(
             item["contig"], "mobile_genetic_element",
-            item["ie_start"], item["ie_end"], ".", parent,
+            item["ie_start"], item["ie_end"], item["ie_strand"], parent,
         ))
         lines.append(_gff_line(
             item["contig"], "attachment_site",
@@ -281,7 +293,7 @@ def write_genbank(path: Path, elements: list[dict], records: dict[str, SeqRecord
         for item in items:
             name = item["name"]
             features.append(_gb_feature(
-                "mobile_element", item["ie_start"], item["ie_end"], ".",
+                "mobile_element", item["ie_start"], item["ie_end"], item["ie_strand"],
                 {
                     "mobile_element_type": ["integrative element"],
                     "note": [name, item["confidence"]],

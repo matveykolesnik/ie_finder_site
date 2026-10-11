@@ -74,7 +74,7 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
             self.assertEqual(
                 [(row[2], int(row[3]), int(row[4]), row[6]) for row in features],
                 [
-                    ("mobile_genetic_element", 10, 370, "."),
+                    ("mobile_genetic_element", 10, 370, "+"),
                     ("attachment_site", 10, 29, "+"),
                     ("attachment_site", 300, 370, "-"),
                     ("CDS", 80, 250, "+"),
@@ -90,6 +90,8 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
             self.assertEqual(int(attl.location.start), 9)
             self.assertEqual(int(attl.location.end), 29)
             self.assertEqual(attl.location.strand, 1)
+            element = next(feat for feat in record.features if feat.type == "mobile_element")
+            self.assertEqual(element.location.strand, 1)
             table = pd.read_csv(tmp / "out.tsv", sep="\t")
             self.assertEqual(list(table["integrase_id"]), ["contig1_1"])
             self.assertEqual(int(table.loc[0, "attL_start"]), 10)
@@ -114,6 +116,9 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
             self.assertEqual(n, 2)
             table = pd.read_csv(tmp / "out.tsv", sep="\t")
             self.assertEqual(set(table["confidence"]), {"confident", "candidate"})
+            # contig1_2 has no integrase hit: its strand is the one opposite the + tRNA.
+            strands = dict(zip(table["integrase_id"], table["ie_strand"]))
+            self.assertEqual(strands, {"contig1_1": "+", "contig1_2": "-"})
 
 
 if __name__ == "__main__":
