@@ -405,6 +405,19 @@ def select_attl_hit(
     )
 
 
+def attr_span(trna_lo: int, trna_hi: int, trna_strand: str, qstart: int, qend: int) -> tuple[int, int]:
+    """Contig coordinates of the tRNA bases aligned to attL, lower first.
+
+    The BLAST query is the tRNA read on its own strand, so query base ``q`` is
+    contig base ``trna_lo + q - 1`` for a ``+`` tRNA and ``trna_hi - q + 1`` for
+    a ``-`` tRNA.
+    """
+    q_lo, q_hi = sorted((int(qstart), int(qend)))
+    if trna_strand == "+":
+        return trna_lo + q_lo - 1, trna_lo + q_hi - 1
+    return trna_hi - q_hi + 1, trna_hi - q_lo + 1
+
+
 def closest_trna_rows(pairs: pd.DataFrame) -> pd.DataFrame:
     """One integrase-tRNA pair per integrase: the tRNA with the smallest ``distance``."""
     if pairs.empty or "distance" not in pairs.columns:
@@ -485,6 +498,8 @@ def evaluate_ie_candidate(
         "attL_bitscore": float("nan"),
         "attL_evalue": float("nan"),
         "attL_tier": "",
+        "attR_abs_lo": 0,
+        "attR_abs_hi": 0,
         "n_v3ps_hits": 0,
         "prodigal_hit_class": "",
         "prodigal_overlap_bp": 0,
@@ -513,6 +528,8 @@ def evaluate_ie_candidate(
     row["candidate_attl_len_bp"] = chosen["best_attl_len_bp"]
     attl_lo, attl_hi = int(chosen["attL_abs_lo"]), int(chosen["attL_abs_hi"])
     trna_lo, trna_hi = sorted((int(trna_start), int(trna_end)))
+    attr_lo, attr_hi = attr_span(trna_lo, trna_hi, trna_strand, chosen["qstart"], chosen["qend"])
+    row["attR_abs_lo"], row["attR_abs_hi"] = attr_lo, attr_hi
     attl_seq = contig_seq[attl_lo - 1:attl_hi] if 1 <= attl_lo <= attl_hi <= len(contig_seq) else ""
     trna_seq = contig_seq[trna_lo - 1:trna_hi] if 1 <= trna_lo <= trna_hi <= len(contig_seq) else ""
     exact = exact_anchored_run(attl_seq, trna_seq, trna_strand, thresholds.shift) if attl_seq and trna_seq else 0
@@ -520,8 +537,8 @@ def evaluate_ie_candidate(
 
     # The element runs from attR to attL and contains the integrase; this is
     # the span written to the GFF3.
-    ie_lo = min(attl_lo, trna_lo, int(integrase_start), int(integrase_end))
-    ie_hi = max(attl_hi, trna_hi, int(integrase_start), int(integrase_end))
+    ie_lo = min(attl_lo, attr_lo, int(integrase_start), int(integrase_end))
+    ie_hi = max(attl_hi, attr_hi, int(integrase_start), int(integrase_end))
     row["ie_id"] = f"{integrase_id}:{contig}:{ie_lo}-{ie_hi}"
     row["ie_len_nt"] = ie_hi - ie_lo + 1
     row["ie_has_ambiguous_n"] = "N" in contig_seq[ie_lo - 1:ie_hi]

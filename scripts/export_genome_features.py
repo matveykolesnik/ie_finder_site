@@ -175,12 +175,14 @@ def build_elements(
         if contig not in records:
             raise SystemExit(f"Contig {contig!r} from the audit is not in the FASTA")
         attl_lo, attl_hi = _int_field(row, "attL_abs_lo"), _int_field(row, "attL_abs_hi")
+        attr_lo, attr_hi = _int_field(row, "attR_abs_lo"), _int_field(row, "attR_abs_hi")
         trna_lo, trna_hi = _int_field(row, "trna_start"), _int_field(row, "trna_end")
-        if None in (attl_lo, attl_hi, trna_lo, trna_hi):
+        if None in (attl_lo, attl_hi, attr_lo, attr_hi, trna_lo, trna_hi):
             logger.warning(f"Skipping {row.get('integrase_id')}: incomplete att coordinates")
             continue
         attl_start, attl_end = ordered_span(attl_lo, attl_hi)
-        attr_start, attr_end = ordered_span(trna_lo, trna_hi)
+        attr_start, attr_end = ordered_span(attr_lo, attr_hi)
+        trna_start, trna_end = ordered_span(trna_lo, trna_hi)
         integrase_id = str(row["integrase_id"])
         hit = integrases.get(integrase_id)
         int_start = int_end = None
@@ -214,7 +216,7 @@ def build_elements(
             "attR_start": attr_start,
             "attR_end": attr_end,
             "attR_strand": gff_strand(row.get("trna_strand", ".")),
-            "attR_type": trna_types.get((integrase_id, attr_start, attr_end), ""),
+            "attR_type": trna_types.get((integrase_id, trna_start, trna_end), ""),
             "integrase_start": int_start or 0,
             "integrase_end": int_end or 0,
             "integrase_strand": int_strand,

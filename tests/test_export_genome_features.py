@@ -27,6 +27,8 @@ def _write_inputs(tmp: Path) -> None:
             "attL_abs_lo": 10,
             "attL_abs_hi": 29,
             "attL_strand": "+",
+            "attR_abs_lo": 300,
+            "attR_abs_hi": 319,
             "passed_confident": True,
         },
         {
@@ -39,6 +41,8 @@ def _write_inputs(tmp: Path) -> None:
             "attL_abs_lo": 1,
             "attL_abs_hi": 20,
             "attL_strand": "+",
+            "attR_abs_lo": 41,
+            "attR_abs_hi": 50,
             "passed_confident": False,
         },
     ]).to_csv(tmp / "audit.tsv", sep="\t", index=False)
@@ -74,9 +78,9 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
             self.assertEqual(
                 [(row[2], int(row[3]), int(row[4]), row[6]) for row in features],
                 [
-                    ("mobile_genetic_element", 10, 370, "+"),
+                    ("mobile_genetic_element", 10, 319, "+"),
                     ("attachment_site", 10, 29, "+"),
-                    ("attachment_site", 300, 370, "-"),
+                    ("attachment_site", 300, 319, "-"),
                     ("CDS", 80, 250, "+"),
                 ],
             )

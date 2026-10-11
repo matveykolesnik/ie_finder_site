@@ -47,7 +47,7 @@ Each element has four features:
 | GFF3 type | GenBank key | meaning |
 |---|---|---|
 | `mobile_genetic_element` | `mobile_element` | span from attR to attL, on the integrase strand |
-| `attachment_site` with `Note=attR` | `misc_feature` / `attR` | the tRNA that was the integration site |
+| `attachment_site` with `Note=attR` | `misc_feature` / `attR` | the part of the tRNA, the integration site, that aligns with attL; `product` names the tRNA |
 | `attachment_site` with `Note=attL` | `misc_feature` / `attL` | the direct repeat of the tRNA 3′ end |
 | `CDS` | `CDS` | the tyrosine integrase |
 

@@ -8,9 +8,16 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from v3ps_filters import FilterThresholds, load_thresholds, select_attl_hit, select_v3ps_strict_hit
+from v3ps_filters import (
+    FilterThresholds,
+    attr_span,
+    load_thresholds,
+    select_attl_hit,
+    select_v3ps_strict_hit,
+)
 
 TRNA_LEN = 75
+TRNA_LO, TRNA_HI = 1325218, 1325292
 WSTART = 1025218
 
 # Hits of a minus-strand tRNA-Ala query from T. oshimai (integrase 1_1374).
@@ -61,6 +68,19 @@ class SelectAttlHitTest(unittest.TestCase):
     def test_unknown_rule_is_rejected(self):
         with self.assertRaises(ValueError):
             select_v3ps_strict_hit(self.hits, TRNA_LEN, "-", 3, 8, "evalue")
+
+
+class AttrSpanTest(unittest.TestCase):
+    def test_minus_trna_counts_the_query_from_its_high_end(self):
+        best = select_v3ps_strict_hit(_hits(NEAR_SHORT_STRONG), TRNA_LEN, "-", 3, 8, "bitscore")
+        # Query bases 30-75 are the 46 bases at the 3' end, the low end of a - tRNA.
+        self.assertEqual(
+            attr_span(TRNA_LO, TRNA_HI, "-", best["qstart"], best["qend"]),
+            (1325218, 1325263),
+        )
+
+    def test_plus_trna_counts_the_query_from_its_low_end(self):
+        self.assertEqual(attr_span(1000, 1074, "+", 30, 75), (1029, 1074))
 
 
 class LoadThresholdsTest(unittest.TestCase):
