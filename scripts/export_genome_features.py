@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write attL/attR on the original assembly, as GFF3 and GenBank.
+"""Write attL/attR on the original assembly, as GFF3.
 
 This script reads the audit table, where attL and the tRNA are in 1-based
 inclusive contig coordinates, and writes features on the assembly itself.
@@ -336,49 +336,6 @@ def _gb_feature(feature_type: str, start: int, end: int, strand: str, qualifiers
     )
 
 
-def write_genbank(path: Path, elements: list[dict], records: dict[str, SeqRecord]) -> None:
-    """Write contigs that carry an element, with features in assembly coordinates."""
-    by_contig: dict[str, list[dict]] = {}
-    for item in elements:
-        by_contig.setdefault(item["contig"], []).append(item)
-    annotated: list[SeqRecord] = []
-    for contig, items in by_contig.items():
-        record = records[contig]
-        features: list[SeqFeature] = []
-        for item in items:
-            name = item["name"]
-            features.append(_gb_feature(
-                "mobile_element", item["ie_start"], item["ie_end"], ".",
-                {
-                    "mobile_element_type": ["integrative element"],
-                    "note": [name, item["confidence"], *_extra_notes(item)],
-                    "label": [name],
-                },
-            ))
-            features.append(_gb_feature(
-                "misc_feature", item["attL_start"], item["attL_end"], item["attL_strand"],
-                {"note": ["attL"], "label": [f"{name} attL"]},
-            ))
-            attr_notes = ["attR"]
-            if item["attR_type"]:
-                attr_notes.append(item["attR_type"])
-            features.append(_gb_feature(
-                "misc_feature", item["attR_start"], item["attR_end"], item["attR_strand"],
-                {"note": attr_notes, "label": [f"{name} attR"]},
-            ))
-            if item["integrase_start"] and item["integrase_end"]:
-                features.append(_gb_feature(
-                    "CDS", item["integrase_start"], item["integrase_end"], item["integrase_strand"],
-                    {"note": ["integrase"], "product": ["tyrosine integrase"], "label": [f"{name} integrase"]},
-                ))
-        record.features = features
-        record.annotations["molecule_type"] = "DNA"
-        annotated.append(record)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as handle:
-        SeqIO.write(annotated, handle, "genbank")
-
-
 def write_table(path: Path, elements: list[dict], tandems: bool = False) -> None:
     """Write a coordinate table, one element per row; with ``tandems``, the tandem columns too."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -533,14 +490,13 @@ def export_genome_features(
     integrases: Path,
     trna: Path | None,
     out_gff3: Path,
-    out_gbk: Path,
     out_tsv: Path,
     sample: str,
     all_candidates: bool,
     tandems: bool = False,
     out_sequences: Path | None = None,
 ) -> int:
-    """Write GFF3, GenBank, and a coordinate table; with ``tandems``, the element sequences too
+    """Write GFF3 and a coordinate table; with ``tandems``, the element sequences too
     (``write_sequences``, under ``out_sequences``).
 
     Returns the element count.
@@ -555,7 +511,6 @@ def export_genome_features(
         all_candidates=all_candidates,
     )
     write_gff3(out_gff3, elements, records)
-    write_genbank(out_gbk, elements, records)
     write_table(out_tsv, elements, tandems)
     logger.info(f"{sample}: {len(elements)} element(s) -> {out_gff3.name}")
     if tandems and out_sequences is not None:
@@ -565,7 +520,7 @@ def export_genome_features(
 
 
 def main() -> None:
-    """Parse arguments and write the three output files."""
+    """Parse arguments and write the output files."""
     parser = argparse.ArgumentParser(
         description="Write attL/attR features in the coordinates of the input assembly"
     )
@@ -574,7 +529,6 @@ def main() -> None:
     parser.add_argument("--integrases", required=True, type=Path, help="integrase_hits_summary.tsv")
     parser.add_argument("--trna", type=Path, default=None, help="integrase_trna.tsv")
     parser.add_argument("--out-gff3", required=True, type=Path)
-    parser.add_argument("--out-gbk", required=True, type=Path)
     parser.add_argument("--out-tsv", required=True, type=Path)
     parser.add_argument("--sample", required=True)
     parser.add_argument(
@@ -589,7 +543,6 @@ def main() -> None:
         integrases=args.integrases,
         trna=args.trna,
         out_gff3=args.out_gff3,
-        out_gbk=args.out_gbk,
         out_tsv=args.out_tsv,
         sample=args.sample,
         all_candidates=args.all_candidates,

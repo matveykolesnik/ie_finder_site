@@ -167,7 +167,7 @@ class ExportTest(unittest.TestCase):
             ]).to_csv(tmp / "trna.tsv", sep="\t", index=False)
             export_genome_features(
                 fasta=tmp / "g.fna", audit=tmp / "audit.tsv", integrases=tmp / "integrases.tsv",
-                trna=tmp / "trna.tsv", out_gff3=tmp / "g.gff3", out_gbk=tmp / "g.gbk",
+                trna=tmp / "trna.tsv", out_gff3=tmp / "g.gff3",
                 out_tsv=tmp / "g.tsv", sample="g", all_candidates=False,
             )
             lines = [l.split("\t") for l in (tmp / "g.gff3").read_text().splitlines() if not l.startswith("#")]

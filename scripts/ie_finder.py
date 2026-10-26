@@ -205,7 +205,6 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
          integrases=out / "integrase_hits_summary.tsv",
          trna=out / "integrase_trna.tsv",
          out_gff3=out / f"{sample}.ie.gff3",
-         out_gbk=out / f"{sample}.ie.gbk",
          out_tsv=out / "attachment_sites_genome.tsv",
          sample=sample,
          all_candidates=run.all_candidates,
@@ -225,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("input", type=Path, help="Assembly FASTA, or a directory of them")
     parser.add_argument("outdir", type=Path, nargs="?", default=ROOT / "outdir",
-                        help="Where the GFF3, GenBank and report go (default: outdir/ in this repository)")
+                        help="Where the GFF3, report and element sequences go (default: outdir/ in this repository)")
     parser.add_argument("--cores", "-j", type=int, default=os.cpu_count() or 1,
                         help="Genomes processed at the same time (default: all CPUs)")
     parser.add_argument("--search-params", type=Path, default=None,
@@ -284,10 +283,8 @@ def main(argv: list[str] | None = None) -> int:
         for sample in samples:
             sample_dir = results / sample
             if sample not in failed:
-                for suffix in (".ie.gff3", ".ie.gbk"):
-                    shutil.copyfile(sample_dir / f"{sample}{suffix}", outdir / f"{sample}{suffix}")
+                shutil.copyfile(sample_dir / f"{sample}.ie.gff3", outdir / f"{sample}.ie.gff3")
                 print(f"GFF3:    {outdir / f'{sample}.ie.gff3'}")
-                print(f"GenBank: {outdir / f'{sample}.ie.gbk'}")
                 if thresholds.tandem_search:
                     for name in SEQUENCE_DIRS:
                         if (sample_dir / "sequences" / name).is_dir():

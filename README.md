@@ -62,19 +62,18 @@ One assembly, or a directory of assemblies. The sample name is the file name wit
 
 Accepted suffixes in a directory are `.fna`, `.fa`, `.fasta`, and `.fsa`. Two files that share a stem are an error.
 
-`outdir/` receives three files per assembly:
+`outdir/` receives two files per assembly:
 
 | file | role |
 |---|---|
 | `TTHB27c.ie.gff3` | features on the input contigs, for a browser track or a download |
-| `TTHB27c.ie.gbk` | the same contigs and features in GenBank |
 | `TTHB27c.ie.report.txt` | one report: counts, why a candidate was rejected, the published coordinates, and any step log that was not empty |
 
 With `tandem_search: true` every element is also written as a sequence of its own, sorted by whether it is in a tandem, and once more, all together, in `all/`:
 
 ```
 outdir/
-├── TTHB27c.ie.gff3, TTHB27c.ie.gbk, TTHB27c.ie.report.txt
+├── TTHB27c.ie.gff3, TTHB27c.ie.report.txt
 ├── single_elements/              elements that are not in a tandem
 │   └── TTHB27c_IE1.fna, TTHB27c_IE1.gbk, ...
 ├── tandem_elements/
@@ -97,14 +96,14 @@ Coordinates are 1-based and inclusive. They refer to the contigs of the FASTA yo
 
 Each element has four features:
 
-| GFF3 type | GenBank key | meaning |
+| GFF3 type | GenBank key, in the element files | meaning |
 |---|---|---|
 | `mobile_genetic_element` | `mobile_element` | span from attR to attL |
 | `attachment_site` with `Note=attR` | `misc_feature` / `attR` | the tRNA that was the integration site |
 | `attachment_site` with `Note=attL` | `misc_feature` / `attL` | the direct repeat of the tRNA 3′ end |
 | `CDS` | `CDS` | the tyrosine integrase |
 
-`confidence=confident` passed the filter. A run with no confident element still writes a valid GFF3 header and an empty GenBank, plus a report that says so.
+`confidence=confident` passed the filter. A run with no confident element still writes a valid GFF3 header, plus a report that says so.
 
 Attributes that appear on an element only where they apply:
 
