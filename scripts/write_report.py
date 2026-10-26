@@ -21,6 +21,7 @@ STEP_LOGS = (
     "trna_proximity.log",
     "extract_trna_region.log",
     "blast_mge.log",
+    "attl_side.log",
     "filter_confident_ie.log",
     "export_genome_features.log",
 )
@@ -62,6 +63,8 @@ def _candidate_line(row: dict[str, str]) -> str:
         f"exact {row.get('exact_anchored_bp', '')} bp\t"
         f"blast {row.get('best_attl_len_bp', '')} bp\t"
         f"{row.get('prodigal_hit_class', '')}"
+        + ("\tintegrase at attL" if row.get("integrase_at", "") == "attL" else "")
+        + (f"\tduplicate of {row['duplicate_of']}" if row.get("duplicate_of", "") else "")
     )
 
 

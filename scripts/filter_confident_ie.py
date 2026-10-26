@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -53,6 +54,77 @@ def load_raw_blast(raw_path: Path) -> pd.DataFrame:
     return pd.read_csv(raw_path, sep="\t", dtype={"contig": str})
 
 
+def resolve_shared_trna(
+    rows: list[dict],
+    int_coords: dict[str, tuple[int, int, int]],
+    contig_seqs: dict[str, str],
+    thresholds: FilterThresholds,
+) -> None:
+    """Confident elements that reached the same tRNA: duplicates and tandems.
+
+    Two candidates can reach one tRNA. An element with an integrase at each end
+    is found from both (``integrase_at`` attR and attL), and elements integrated
+    one after another into the same tRNA each find it, since every integration
+    leaves the tRNA whole at the attR end. The same attL twice is one element:
+    the first row keeps it, an integrase next to the tRNA before one next to
+    attL, and the others are rejected as ``duplicate``. Different attLs are a
+    tandem: the nearest element runs from the tRNA to its attL, and each further
+    one from the attL copy before it -- its attR -- to its own attL. Where a
+    further element's integrase lies before that copy, the two are nested
+    rather than in tandem and are left as they are.
+
+    Rows are updated in place: ``attR_lo``/``attR_hi``, ``attR_after`` (the
+    integrase of the element before), the element span and the checks that
+    depend on it.
+    """
+    groups: dict[tuple, list[dict]] = defaultdict(list)
+    for row in rows:
+        if row.get("passed_confident"):
+            key = (row["contig"], row["trna_start"], row["trna_end"], row["trna_strand"])
+            groups[key].append(row)
+    for (contig, trna_start, trna_end, strand), members in groups.items():
+        if len(members) < 2:
+            continue
+        kept: list[dict] = []
+        first: dict[tuple[int, int], dict] = {}
+        for row in sorted(members, key=lambda r: r.get("integrase_at") != "attR"):
+            attl = (int(row["attL_abs_lo"]), int(row["attL_abs_hi"]))
+            if attl in first:
+                row["passed_confident"] = False
+                row["reject_reason"] = "duplicate"
+                row["duplicate_of"] = first[attl]["integrase_id"]
+                continue
+            first[attl] = row
+            kept.append(row)
+
+        def from_trna(row: dict) -> int:
+            if strand == "+":
+                return int(row["attL_abs_lo"]) - int(trna_end)
+            return int(trna_start) - int(row["attL_abs_hi"])
+
+        kept.sort(key=from_trna)
+        seq = contig_seqs[contig]
+        for inner, outer in zip(kept, kept[1:]):
+            int_lo, int_hi = sorted(int_coords[outer["integrase_id"]][:2])
+            if strand == "+" and int_lo <= int(inner["attL_abs_hi"]):
+                continue
+            if strand == "-" and int_hi >= int(inner["attL_abs_lo"]):
+                continue
+            outer["attR_lo"], outer["attR_hi"] = int(inner["attL_abs_lo"]), int(inner["attL_abs_hi"])
+            outer["attR_after"] = inner["integrase_id"]
+            lo = min(int(outer["attL_abs_lo"]), outer["attR_lo"], int_lo)
+            hi = max(int(outer["attL_abs_hi"]), outer["attR_hi"], int_hi)
+            outer["ie_id"] = f"{outer['integrase_id']}:{contig}:{lo}-{hi}"
+            outer["ie_len_nt"] = hi - lo + 1
+            outer["ie_has_ambiguous_n"] = "N" in seq[lo - 1:hi]
+            if thresholds.reject_ambiguous_n_ie and outer["ie_has_ambiguous_n"]:
+                outer["passed_no_ambiguous_n"] = outer["passed_confident"] = False
+                outer["reject_reason"] = "ambiguous_n"
+            if thresholds.ie_min_nt > 0 and outer["ie_len_nt"] < thresholds.ie_min_nt:
+                outer["passed_ie_len"] = outer["passed_confident"] = False
+                outer["reject_reason"] = outer["reject_reason"] or "ie_too_short"
+
+
 def filter_sample(
     *,
     sample: str,
@@ -94,7 +166,6 @@ def filter_sample(
     genome = read_genome(fasta_path)
 
     audit_rows: list[dict] = []
-    n_passed = 0
     for _, trna_row in trna_df.iterrows():
         integrase_id = str(trna_row["integrase_id"])
         contig = str(trna_row["contig"]).strip()
@@ -139,9 +210,16 @@ def filter_sample(
         )
         audit["sample"] = sample
         audit["qseqid"] = qseqid
+        # Pairs made through attL (attl_side.py) say so; the others face the tRNA.
+        at = trna_row.get("integrase_at", "attR")
+        audit["integrase_at"] = at if isinstance(at, str) and at else "attR"
+        audit["attR_lo"], audit["attR_hi"] = sorted((trna_start, trna_end))
+        audit["attR_after"] = ""
         audit_rows.append(audit)
-        n_passed += bool(audit["passed_confident"])
 
+    contig_seqs = {c: str(r.seq).upper() for c, r in genome.items()}
+    resolve_shared_trna(audit_rows, int_coords, contig_seqs, thresholds)
+    n_passed = sum(bool(row.get("passed_confident")) for row in audit_rows)
     pd.DataFrame(audit_rows).to_csv(out_audit, sep="\t", index=False)
     logger.info(f"{sample}: {n_passed}/{len(trna_df)} confident IE(s) -> {out_audit.name}")
     return n_passed

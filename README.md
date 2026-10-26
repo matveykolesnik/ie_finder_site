@@ -6,7 +6,7 @@ The pipeline reads a genome assembly in FASTA and writes attL/attR, the integras
 
 ## What an element is
 
-A confident element is a phage-type tyrosine integrase next to an opposite-strand tRNA, with a direct repeat of that tRNA 3′ end. The integrase protein is longer than 300 aa, attL does not overlap a CDS, and the repeat is either an exact run of at least 14 bp or a BLAST hit of at least 17 bp. Alignment gaps in the repeat are allowed. Setting `attl_reject_gapped: true` rejects them, as the published finder did. Among the BLAST hits anchored at the tRNA 3′ end, attL is the one with the highest bitscore, so a long but poor match far from the tRNA does not win over a near-perfect repeat. Setting `attl_select_by: length` takes the longest hit instead, as the published finder did. An ORF is an integrase when it reaches the Pfam gathering threshold of PF00589 or PF22022. Setting `integrase_hmm_cutoff: none` keeps every hit HMMER reports instead, as the published finder did. Integrase length is the predicted protein without its stop codon; setting `integrase_len_from: span` divides the ORF span by 3 instead, which counts the stop codon, as the published finder did. Those thresholds are in `search_params.yaml`. Cohort deduplication from the main repository is not part of this copy.
+A confident element is a phage-type tyrosine integrase and a tRNA, with a direct repeat of that tRNA 3′ end. The integrase sits at one end of the element: next to the tRNA on the opposite strand, their 3′ ends at most `trna_max_distance_bp` (700 bp; the published finder used 500) apart, or next to the repeat (attL) on the tRNA's strand, its 3′ end within `trna_max_distance_bp` of attL — the layout of the tailless IN93/P23-77-like Thermus phages, which the published rule never makes candidates. Setting `integrase_at: trna` keeps only the first, as the published finder did. An integrase at the attL end is paired with the nearest tRNA on its 3′ side whose 3′ end it finds copied next to itself (`scripts/attl_side.py`); after that, the candidate goes through the same filters as any other. The integrase protein is longer than 300 aa, attL does not overlap a CDS, and the repeat is either an exact run of at least 14 bp or a BLAST hit of at least 17 bp. Alignment gaps in the repeat are allowed. Setting `attl_reject_gapped: true` rejects them, as the published finder did. Among the BLAST hits anchored at the tRNA 3′ end, attL is the one with the highest bitscore, so a long but poor match far from the tRNA does not win over a near-perfect repeat. Setting `attl_select_by: length` takes the longest hit instead, as the published finder did. An ORF is an integrase when it reaches the Pfam gathering threshold of PF00589 or PF22022. Setting `integrase_hmm_cutoff: none` keeps every hit HMMER reports instead, as the published finder did. Integrase length is the predicted protein without its stop codon; setting `integrase_len_from: span` divides the ORF span by 3 instead, which counts the stop codon, as the published finder did. Those thresholds are in `search_params.yaml`. Cohort deduplication from the main repository is not part of this copy.
 
 ## Requirements
 
@@ -52,6 +52,13 @@ Each element has four features:
 | `CDS` | `CDS` | the tyrosine integrase |
 
 `confidence=confident` passed the filter. A run with no confident element still writes a valid GFF3 header and an empty GenBank, plus a report that says so.
+
+Attributes that appear on an element only where they apply:
+
+- `integrase_at=attL` when its integrase sits at the attL end.
+- `attR_after=IE<n>` when it integrated into the copy of the tRNA 3′ end that element IE<n> left. Elements integrated one after another into one tRNA are delimited by consecutive copies, so its attR is that copy, not the tRNA.
+
+An element found from both ends (an integrase at each) is written once.
 
 Intermediate tables and BLAST output are written to a temporary directory and removed when the run succeeds.
 

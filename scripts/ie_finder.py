@@ -33,6 +33,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import yaml
 
 from annotate_mge_region import main as blast_attl_windows
+from attl_side import find_attl_side_pairs
 from annotate_trna_proximity import find_nearby_trnas, parse_integrases, parse_trna, write_results
 from export_genome_features import export_genome_features
 from extract_trna_region import extract_trna_sequence
@@ -179,6 +180,12 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
     step(sample, out, "blast_mge", blast_attl_windows,
          str(fasta), str(out / "mge_query.fa"), str(out / "mge_blast_raw.tsv"), str(out),
          window_size=t.attl_window_bp)
+    if t.integrase_at == "either":
+        # Integrases the first pairing left alone, paired through an attL next
+        # to their 3' end; appended to integrase_trna.tsv and mge_blast_raw.tsv.
+        step(sample, out, "attl_side", find_attl_side_pairs,
+             fasta, out / "integrase_hits_summary.tsv", out / "trna.tsv",
+             out / "integrase_trna.tsv", out / "mge_blast_raw.tsv", out, t)
     step(sample, out, "filter_confident_ie", filter_sample,
          sample=sample,
          trna_path=out / "integrase_trna.tsv",

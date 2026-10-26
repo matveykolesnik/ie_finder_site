@@ -40,6 +40,8 @@ TSV_COLUMNS = [
     "integrase_end",
     "integrase_strand",
     "confidence",
+    "integrase_at",
+    "attR_after",
 ]
 
 
@@ -174,7 +176,13 @@ def build_elements(
             logger.warning(f"Skipping {row.get('integrase_id')}: incomplete att coordinates")
             continue
         attl_start, attl_end = ordered_span(attl_lo, attl_hi)
-        attr_start, attr_end = ordered_span(trna_lo, trna_hi)
+        # attR is the tRNA, or in a tandem the attL copy of the element before
+        # (filter_confident_ie.resolve_shared_trna); the tRNA type labels both.
+        attr_lo, attr_hi = _int_field(row, "attR_lo"), _int_field(row, "attR_hi")
+        if attr_lo is None or attr_hi is None:
+            attr_lo, attr_hi = trna_lo, trna_hi
+        attr_start, attr_end = ordered_span(attr_lo, attr_hi)
+        trna_start, trna_end = ordered_span(trna_lo, trna_hi)
         integrase_id = str(row["integrase_id"])
         hit = integrases.get(integrase_id)
         int_start = int_end = None
@@ -202,16 +210,39 @@ def build_elements(
             "attR_start": attr_start,
             "attR_end": attr_end,
             "attR_strand": gff_strand(row.get("trna_strand", ".")),
-            "attR_type": trna_types.get((integrase_id, attr_start, attr_end), ""),
+            "attR_type": trna_types.get((integrase_id, trna_start, trna_end), ""),
             "integrase_start": int_start or 0,
             "integrase_end": int_end or 0,
             "integrase_strand": int_strand,
             "confidence": "confident" if passed else "candidate",
+            "integrase_at": _text_field(row, "integrase_at") or "attR",
+            "attR_after": _text_field(row, "attR_after"),
         })
     elements.sort(key=lambda item: (item["contig"], item["ie_start"], item["integrase_id"]))
     for index, item in enumerate(elements, start=1):
         item["name"] = f"IE{index}"
+    # attR_after names the element before by its integrase; give its name instead.
+    names = {item["integrase_id"]: item["name"] for item in elements}
+    for item in elements:
+        if item["attR_after"]:
+            item["attR_after"] = names.get(item["attR_after"], "")
     return elements
+
+
+def _text_field(row: pd.Series, column: str) -> str:
+    if column not in row.index or pd.isna(row[column]):
+        return ""
+    return str(row[column]).strip()
+
+
+def _extra_notes(item: dict) -> list[str]:
+    """What sets an element apart from the usual layout, if anything."""
+    notes = []
+    if item.get("integrase_at") == "attL":
+        notes.append("integrase at attL")
+    if item.get("attR_after"):
+        notes.append(f"attR is the attL of {item['attR_after']}")
+    return notes
 
 
 def _gff_line(contig: str, feature_type: str, start: int, end: int, strand: str, attributes: str) -> str:
@@ -235,6 +266,11 @@ def write_gff3(path: Path, elements: list[dict], records: dict[str, SeqRecord]) 
             f"ID={name};Name={name};integrase_id={gff_escape(item['integrase_id'])};"
             f"confidence={item['confidence']}"
         )
+        # Only where they say something, so the usual element reads as before.
+        if item.get("integrase_at") == "attL":
+            parent += ";integrase_at=attL"
+        if item.get("attR_after"):
+            parent += f";attR_after={gff_escape(item['attR_after'])}"
         lines.append(_gff_line(
             item["contig"], "mobile_genetic_element",
             item["ie_start"], item["ie_end"], ".", parent,
@@ -284,7 +320,7 @@ def write_genbank(path: Path, elements: list[dict], records: dict[str, SeqRecord
                 "mobile_element", item["ie_start"], item["ie_end"], ".",
                 {
                     "mobile_element_type": ["integrative element"],
-                    "note": [name, item["confidence"]],
+                    "note": [name, item["confidence"], *_extra_notes(item)],
                     "label": [name],
                 },
             ))

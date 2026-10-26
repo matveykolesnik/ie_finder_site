@@ -5,6 +5,7 @@ import csv
 import re
 import subprocess
 from logger import get_logger
+from v3ps_filters import DEFAULT_TRNA_MAX_DISTANCE_BP
 
 logger = get_logger("trna_proximity")
 
@@ -157,7 +158,7 @@ def effective_coord_trna(trna):
         return None
 
 
-def find_nearby_trnas(integrases, trnas, max_distance=500):
+def find_nearby_trnas(integrases, trnas, max_distance=DEFAULT_TRNA_MAX_DISTANCE_BP):
     """Find tRNAs located within a specified distance of integrases.
 
     Groups tRNA entries by contig and then, for each integrase, finds tRNAs on the
@@ -167,7 +168,8 @@ def find_nearby_trnas(integrases, trnas, max_distance=500):
     Args:
         integrases (list of dict): List of integrase entries.
         trnas (list of dict): List of tRNA entries.
-        max_distance (int, optional): Maximum allowed distance (default is 500).
+        max_distance (int, optional): Maximum allowed distance (default:
+            ``trna_max_distance_bp`` of search_params.yaml).
 
     Returns:
         list of dict: A list of result dictionaries containing integrase and tRNA data,
@@ -257,8 +259,8 @@ def main():
                         help="Aragorn output file (plain text)")
     parser.add_argument("--output", required=True,
                         help="Output TSV file for integrases and nearby tRNAs")
-    parser.add_argument("--max_distance", type=int, default=500,
-                        help="Maximum allowed distance (default 500)")
+    parser.add_argument("--max_distance", type=int, default=DEFAULT_TRNA_MAX_DISTANCE_BP,
+                        help=f"Maximum allowed distance (default {DEFAULT_TRNA_MAX_DISTANCE_BP})")
     args = parser.parse_args()
 
     integrases = parse_integrases(args.integrases)

@@ -5,12 +5,14 @@
 # An unknown key stops the run. The report lists the values that were used.
 #
 # Same cascade as MGE_finder at the commit in UPSTREAM, without cohort
-# deduplication, with four departures: integrase hits must reach the Pfam
+# deduplication, with six departures: integrase hits must reach the Pfam
 # gathering threshold, integrase length leaves out the stop codon, attL is the
-# best-scoring BLAST hit rather than the longest, and gapped attL alignments
-# are kept. Set integrase_hmm_cutoff: none, integrase_len_from: span,
-# attl_select_by: length and attl_reject_gapped: true to reproduce the
-# published rules.
+# best-scoring BLAST hit rather than the longest, gapped attL alignments are
+# kept, the integrase may sit at the attL end of the element rather than next
+# to the tRNA, and it may sit up to 700 bp from its att site rather than 500.
+# Set integrase_hmm_cutoff: none, integrase_len_from: span, attl_select_by:
+# length, attl_reject_gapped: true, integrase_at: trna and
+# trna_max_distance_bp: 500 to reproduce the published rules.
 
 # Which HMMER hits count as integrases: ga keeps hits at or above each Pfam
 # profile's gathering threshold; none keeps every hit HMMER reports (E-value up
@@ -18,7 +20,18 @@
 integrase_hmm_cutoff: ga
 
 # Integrase and tRNA must be on opposite strands with 3' ends at most this far apart (bp).
-trna_max_distance_bp: 500
+# With integrase_at: either, the same distance applies between the integrase 3'
+# end and attL when the integrase sits at that end instead. The published finder
+# used 500; 700 also takes in a Thermus albus prophage (SPbeta/PBSX-like head
+# and tail genes) whose integrase faces the tRNA from 609 bp, across a small ORF.
+trna_max_distance_bp: 700
+
+# Where the integrase may sit: trna -- next to the tRNA (attR), facing it from
+# the opposite strand, as the published finder required; either -- also at the
+# far end, on the tRNA's strand, its 3' end facing attL. Tailless Thermus phages
+# of the IN93/P23-77 kind (Matsushitaviridae) are built the second way, and the
+# published rule never makes them candidates.
+integrase_at: either
 
 # Allowed offset (bp) between a BLAST hit end and the tRNA 3' end. The same
 # offset absorbs indels where the exact run starts.

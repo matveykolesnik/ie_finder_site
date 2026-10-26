@@ -31,14 +31,14 @@ BLAST_COLS = [
 
 
 def run_blast_on_region(
-    query_rec: SeqRecord,
+    query_rec: SeqRecord | list[SeqRecord],
     subject_seq: Seq,
     tmp_dir: str = ".",
 ) -> pd.DataFrame:
-    """Run nucleotide BLAST of one tRNA query against a genomic window.
+    """Run nucleotide BLAST of tRNA queries against a genomic window.
 
     Args:
-        query_rec: tRNA query sequence record.
+        query_rec: tRNA query sequence record, or several in one search.
         subject_seq: Genomic window sequence.
         tmp_dir: Directory for the temporary query, subject and output files.
 
@@ -51,7 +51,7 @@ def run_blast_on_region(
         sfa = os.path.join(tmp, "subject.fa")
         bout = os.path.join(tmp, "blast.tsv")
 
-        SeqIO.write([query_rec], qfa, "fasta")
+        SeqIO.write(query_rec if isinstance(query_rec, list) else [query_rec], qfa, "fasta")
         SeqIO.write([SeqRecord(subject_seq, id="subject", description="")], sfa, "fasta")
 
         subprocess.run(
