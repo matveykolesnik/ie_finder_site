@@ -93,6 +93,27 @@ def _tsv_block(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _tandem_lines(sites: list[dict[str, str]]) -> list[str]:
+    """One line per tandem: where, and its members outwards from the tRNA."""
+    groups: dict[str, list[dict[str, str]]] = {}
+    for row in sites:
+        if row.get("tandem", "").strip():
+            groups.setdefault(row["tandem"], []).append(row)
+    lines = []
+    for name, rows in groups.items():
+        rows.sort(key=lambda r: int(r["tandem_member"].split("/")[0]))
+        lo = min(int(r["ie_start"]) for r in rows)
+        hi = max(int(r["ie_end"]) for r in rows)
+        members = ", ".join(
+            f"{r.get('element') or r['integrase_id']} {r['ie_start']}-{r['ie_end']}"
+            + (f" ({r['found_by']})" if r.get("found_by", "").strip() else "")
+            for r in rows
+        )
+        lines.append(f"{name}\t{rows[0]['contig']}\t{lo}-{hi}\t{rows[0]['attR_strand']}\t"
+                     f"{rows[0]['attR_type']}\t{members}")
+    return lines or ["(none)"]
+
+
 def build_report(
     sample_dir: Path,
     *,
@@ -139,7 +160,10 @@ def build_report(
         parts.extend(_candidate_line(row) for row in audit)
     else:
         parts.append("(none)")
-    parts.extend(["", "published_coordinates", _tsv_block(sites), "", "audit", _tsv_block(audit), "", "logs"])
+    parts.extend(["", "published_coordinates", _tsv_block(sites)])
+    if sites and "tandem" in sites[0]:
+        parts.extend(["", "tandems", *_tandem_lines(sites)])
+    parts.extend(["", "audit", _tsv_block(audit), "", "logs"])
     any_log = False
     for name in STEP_LOGS:
         path = sample_dir / name

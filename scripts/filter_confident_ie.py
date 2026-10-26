@@ -11,6 +11,7 @@ import pandas as pd
 
 from genome import contig_record, read_genome
 from logger import get_logger
+from tandems import find_tandems, read_integrases
 from v3ps_filters import (
     FilterThresholds,
     build_qseqid,
@@ -219,9 +220,17 @@ def filter_sample(
 
     contig_seqs = {c: str(r.seq).upper() for c, r in genome.items()}
     resolve_shared_trna(audit_rows, int_coords, contig_seqs, thresholds)
+    if thresholds.tandem_search:
+        # Elements in tandem at one tRNA: split at inner copies, add the ones past attL.
+        audit_rows += find_tandems(
+            audit_rows, read_integrases(integrase_hits_path, thresholds), int_coords,
+            contig_seqs, cds_by_contig, thresholds, str(out_audit.parent),
+        )
     n_passed = sum(bool(row.get("passed_confident")) for row in audit_rows)
     pd.DataFrame(audit_rows).to_csv(out_audit, sep="\t", index=False)
-    logger.info(f"{sample}: {n_passed}/{len(trna_df)} confident IE(s) -> {out_audit.name}")
+    logger.info(f"{sample}: {n_passed} confident IE(s) from {len(trna_df)} integrase-tRNA pair(s) -> {out_audit.name}"
+                if thresholds.tandem_search else
+                f"{sample}: {n_passed}/{len(trna_df)} confident IE(s) -> {out_audit.name}")
     return n_passed
 
 

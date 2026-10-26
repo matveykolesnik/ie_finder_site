@@ -67,3 +67,22 @@ ie_min_nt: 0
 
 # Reject elements that contain ambiguous N bases.
 reject_ambiguous_n_ie: false
+
+# Tandems: elements integrated one after another at the same tRNA,
+#   tRNA - element 1 - att copy - element 2 - att copy ...
+# Each integration leaves a copy of the tRNA 3' end at the element's far end, and
+# the next element can take the same site. attL is the best-scoring copy, so a
+# tandem is either called as one element (the outer copy won) or loses its outer
+# members (the inner copy won); their integrases sit next to a copy, not a tRNA
+# gene, and are never paired. With tandem_search: true the copies from the tRNA to
+# tandem_window_bp past the outermost attL are found again (the attL gates, plus
+# tandem_min_att_bp and tandem_min_att_pident), and a copy becomes a junction when
+# an integrase faces it as it would face the tRNA (opposite strand, 3' ends within
+# trna_max_distance_bp) or, with integrase_at: either, ends the element whose
+# integrase faces it from the tRNA's strand. Elements are split and added
+# accordingly (scripts/tandems.py), and the tandems are written whole as well.
+# tandem_search: false gives the output of the finder without it.
+tandem_search: true
+tandem_window_bp: 60000
+tandem_min_att_bp: 30
+tandem_min_att_pident: 80

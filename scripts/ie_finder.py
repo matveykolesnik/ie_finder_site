@@ -46,6 +46,10 @@ from write_report import write_report
 
 ROOT = Path(__file__).resolve().parents[1]
 FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".fsa")
+# Written with the tandem search on: every element as a sequence (FASTA, GenBank), in
+# single_elements/ and tandem_elements/{full,split}/ of the output directory, and the
+# GenBank files of the single elements and tandem members together in all/.
+SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all")
 PFAM_PROFILES = (ROOT / "pfam" / "PF00589.hmm", ROOT / "pfam" / "PF22022.hmm")
 
 
@@ -204,7 +208,9 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
          out_gbk=out / f"{sample}.ie.gbk",
          out_tsv=out / "attachment_sites_genome.tsv",
          sample=sample,
-         all_candidates=run.all_candidates)
+         all_candidates=run.all_candidates,
+         tandems=t.tandem_search,
+         out_sequences=out / "sequences")
 
 
 def upstream_commit() -> str:
@@ -282,6 +288,11 @@ def main(argv: list[str] | None = None) -> int:
                     shutil.copyfile(sample_dir / f"{sample}{suffix}", outdir / f"{sample}{suffix}")
                 print(f"GFF3:    {outdir / f'{sample}.ie.gff3'}")
                 print(f"GenBank: {outdir / f'{sample}.ie.gbk'}")
+                if thresholds.tandem_search:
+                    for name in SEQUENCE_DIRS:
+                        if (sample_dir / "sequences" / name).is_dir():
+                            shutil.copytree(sample_dir / "sequences" / name, outdir / name, dirs_exist_ok=True)
+                    print(f"Sequences: {', '.join(str(outdir / name) for name in SEQUENCE_DIRS)}")
             # A report is written whenever there are tables to report on, so a
             # failed genome still says how far it got.
             if (sample_dir / "integrase_hits_summary.tsv").is_file() or (sample_dir / "ie_filter_audit.tsv").is_file():

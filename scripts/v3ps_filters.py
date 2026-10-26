@@ -58,6 +58,10 @@ DEFAULT_INTEGRASE_LEN_FROM = "protein"
 INTEGRASE_LEN_FROM_CHOICES = ("protein", "span")
 DEFAULT_INTEGRASE_AT = "either"
 INTEGRASE_AT_CHOICES = ("trna", "either")
+DEFAULT_TANDEM_SEARCH = True
+DEFAULT_TANDEM_WINDOW_BP = 60_000
+DEFAULT_TANDEM_MIN_ATT_BP = 30
+DEFAULT_TANDEM_MIN_ATT_PIDENT = 80
 
 
 @dataclass(frozen=True)
@@ -90,6 +94,14 @@ class FilterThresholds:
         integrase_hmm_cutoff: ``ga`` keeps integrase hits at or above each
             profile's Pfam gathering threshold; ``none`` keeps every hit HMMER
             reports (E-value up to 10), as the published finder did.
+        tandem_search: Look for elements integrated one after another at the
+            same tRNA (``tandems.py``): split an element at an inner copy of
+            the tRNA 3' end, and add the elements past its attL.
+        tandem_window_bp: How far past the outermost attL of a tRNA's elements
+            further elements are looked for.
+        tandem_min_att_bp: A copy of the tRNA 3' end counts as a junction of a
+            tandem when its anchored hit is at least this long ...
+        tandem_min_att_pident: ... and at least this identical to the tRNA (%).
     """
 
     shift: int = DEFAULT_SHIFT
@@ -106,6 +118,10 @@ class FilterThresholds:
     reject_ambiguous_n_ie: bool = False
     attl_select_by: str = DEFAULT_ATTL_SELECT_BY
     integrase_hmm_cutoff: str = DEFAULT_INTEGRASE_HMM_CUTOFF
+    tandem_search: bool = DEFAULT_TANDEM_SEARCH
+    tandem_window_bp: int = DEFAULT_TANDEM_WINDOW_BP
+    tandem_min_att_bp: int = DEFAULT_TANDEM_MIN_ATT_BP
+    tandem_min_att_pident: int = DEFAULT_TANDEM_MIN_ATT_PIDENT
 
 
 # search_params.yaml key -> FilterThresholds field, in the order of that file.
@@ -124,8 +140,12 @@ PARAM_FIELDS: dict[str, str] = {
     "integrase_len_from": "integrase_len_from",
     "ie_min_nt": "ie_min_nt",
     "reject_ambiguous_n_ie": "reject_ambiguous_n_ie",
+    "tandem_search": "tandem_search",
+    "tandem_window_bp": "tandem_window_bp",
+    "tandem_min_att_bp": "tandem_min_att_bp",
+    "tandem_min_att_pident": "tandem_min_att_pident",
 }
-_BOOL_PARAMS = {"attl_reject_gapped", "reject_ambiguous_n_ie"}
+_BOOL_PARAMS = {"attl_reject_gapped", "reject_ambiguous_n_ie", "tandem_search"}
 _CHOICE_PARAMS = {
     "attl_select_by": ATTL_SELECT_CHOICES,
     "integrase_hmm_cutoff": INTEGRASE_HMM_CUTOFF_CHOICES,
