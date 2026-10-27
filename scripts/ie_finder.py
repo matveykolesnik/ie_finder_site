@@ -48,10 +48,8 @@ ROOT = Path(__file__).resolve().parents[1]
 FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".fsa")
 # Written with the tandem search on: every element as a sequence (FASTA, GenBank), in
 # single_elements/ and tandem_elements/{full,split}/ of the output directory, and the
-# GenBank files of the single elements and tandem members together in all/. Elements
-# whose attL search window ran into a contig end are left out, or with
-# --truncated-elements written to truncated_elements/.
-SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all", "truncated_elements")
+# GenBank files of the single elements and tandem members together in all/.
+SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all")
 PFAM_PROFILES = (ROOT / "pfam" / "PF00589.hmm", ROOT / "pfam" / "PF22022.hmm")
 
 
@@ -77,7 +75,6 @@ class Run:
     thresholds: FilterThresholds
     params_used: Path
     all_candidates: bool
-    truncated_elements: bool = False
 
 
 def collect_inputs(path: Path) -> dict[str, Path]:
@@ -212,8 +209,7 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
          sample=sample,
          all_candidates=run.all_candidates,
          tandems=t.tandem_search,
-         out_sequences=out / "sequences",
-         truncated_elements=run.truncated_elements)
+         out_sequences=out / "sequences")
 
 
 def upstream_commit() -> str:
@@ -237,9 +233,6 @@ def main(argv: list[str] | None = None) -> int:
                         help="Also write candidates that have attL but failed a later filter")
     parser.add_argument("--keep-work", action="store_true",
                         help="Keep the temporary work directory")
-    parser.add_argument("--truncated-elements", action="store_true",
-                        help="Also write the sequences of elements whose attL search window ran into "
-                             "a contig end, into truncated_elements/ (by default they are only in the GFF3)")
     args = parser.parse_args(argv)
 
     try:
@@ -267,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         hmm = results / "combined" / "pfam_combined.hmm"
         hmm.parent.mkdir(parents=True)
         hmm.write_text("".join(p.read_text() for p in PFAM_PROFILES))
-        run = Run(results, hmm, thresholds, params_used, args.all_candidates, args.truncated_elements)
+        run = Run(results, hmm, thresholds, params_used, args.all_candidates)
 
         failures: list[StepFailed] = []
         workers = max(1, min(args.cores, len(samples)))
@@ -293,11 +286,10 @@ def main(argv: list[str] | None = None) -> int:
                 shutil.copyfile(sample_dir / f"{sample}.ie.gff3", outdir / f"{sample}.ie.gff3")
                 print(f"GFF3:    {outdir / f'{sample}.ie.gff3'}")
                 if thresholds.tandem_search:
-                    written = [name for name in SEQUENCE_DIRS if (sample_dir / "sequences" / name).is_dir()]
-                    for name in written:
-                        shutil.copytree(sample_dir / "sequences" / name, outdir / name, dirs_exist_ok=True)
-                    if written:
-                        print(f"Sequences: {', '.join(str(outdir / name) for name in written)}")
+                    for name in SEQUENCE_DIRS:
+                        if (sample_dir / "sequences" / name).is_dir():
+                            shutil.copytree(sample_dir / "sequences" / name, outdir / name, dirs_exist_ok=True)
+                    print(f"Sequences: {', '.join(str(outdir / name) for name in SEQUENCE_DIRS)}")
             # A report is written whenever there are tables to report on, so a
             # failed genome still says how far it got.
             if (sample_dir / "integrase_hits_summary.tsv").is_file() or (sample_dir / "ie_filter_audit.tsv").is_file():

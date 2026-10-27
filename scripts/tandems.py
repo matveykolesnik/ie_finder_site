@@ -330,7 +330,7 @@ def find_tandems(
             if row is None:
                 template = chain[0]
                 row = {f: template.get(f) for f in ("sample", "contig", "trna_start", "trna_end", "trna_strand",
-                                                    "trna_len", "window_searched_bp", "window_truncated")}
+                                                    "trna_len")}
                 row.update({
                     "integrase_id": integ["orf_id"], "integrase_len_aa": integ["aa"],
                     "qseqid": build_qseqid(integ["orf_id"], contig, t_lo, t_hi, strand),

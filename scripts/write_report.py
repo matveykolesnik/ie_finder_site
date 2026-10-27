@@ -66,8 +66,6 @@ def _candidate_line(row: dict[str, str]) -> str:
         f"{row.get('prodigal_hit_class', '')}"
         + ("\tintegrase at attL" if row.get("integrase_at", "") == "attL" else "")
         + (f"\tduplicate of {row['duplicate_of']}" if row.get("duplicate_of", "") else "")
-        + (f"\twindow cut at contig end, {row.get('window_searched_bp', '')} bp searched"
-           if _passed(row.get("window_truncated", "")) else "")
     )
 
 
@@ -136,9 +134,6 @@ def build_report(
     sites = _rows(sample_dir / "attachment_sites_genome.tsv")
     n_pass = sum(1 for row in audit if _passed(row.get("passed_confident", "")))
     n_fail = len(audit) - n_pass
-    # Candidates whose attL search window ran into a contig end, by outcome.
-    cut = [row for row in audit if _passed(row.get("window_truncated", ""))]
-    n_cut_pass = sum(1 for row in cut if _passed(row.get("passed_confident", "")))
     # Candidates with an attL hit carry its coordinate; the others have 0 or nothing.
     n_attl = sum(1 for row in audit if row.get("attL_abs_lo", "").strip() not in {"", "0"})
 
@@ -159,8 +154,6 @@ def build_report(
         f"audit_rows\t{len(audit)}",
         f"confident\t{n_pass}",
         f"rejected\t{n_fail}",
-        f"confident_window_truncated\t{n_cut_pass}",
-        f"rejected_window_truncated\t{len(cut) - n_cut_pass}",
         "",
         "candidates",
     ]

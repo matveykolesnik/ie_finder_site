@@ -19,13 +19,7 @@ from Bio.SeqRecord import SeqRecord
 
 from genome import contig_record, read_genome
 from logger import get_logger
-from v3ps_filters import (
-    DEFAULT_ATTL_WINDOW_BP,
-    attl_search_window,
-    build_qseqid,
-    closest_trna_rows,
-    load_thresholds,
-)
+from v3ps_filters import DEFAULT_ATTL_WINDOW_BP, build_qseqid, closest_trna_rows, load_thresholds
 
 logger = get_logger("annotate_mge_region")
 
@@ -138,11 +132,12 @@ def main(
             raise ValueError(f"Query {rec.id} in {query_fa} is not a pair of {pairs_tsv}")
         integrase_id, contig, trna_start, trna_end, strand = pairs[rec.id]
 
+        if strand == "+":
+            window_start, window_end = trna_end, trna_end + window_size
+        else:
+            window_start, window_end = max(1, trna_start - window_size), trna_start
         contig_seq = contig_record(genome, contig).seq
-        window_start, window_end, _ = attl_search_window(
-            trna_start, trna_end, strand, len(contig_seq), window_size
-        )
-        subject = contig_seq[window_start - 1 : window_end]
+        subject = contig_seq[window_start - 1 : min(len(contig_seq), window_end)]
 
         hits = run_blast_on_region(
             SeqRecord(rec.seq, id=rec.id, description=""),

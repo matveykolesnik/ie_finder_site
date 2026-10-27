@@ -450,21 +450,6 @@ def attr_span(trna_lo: int, trna_hi: int, trna_strand: str, qstart: int, qend: i
     return trna_hi - q_hi + 1, trna_hi - q_lo + 1
 
 
-def attl_search_window(
-    trna_start: int, trna_end: int, trna_strand: str, contig_len: int, window_bp: int,
-) -> tuple[int, int, bool]:
-    """The contig span searched for attL, and whether a contig end cut it short.
-
-    The span runs ``window_bp`` past the tRNA 3' end, which it includes, on the
-    tRNA's 3' side; 1-based inclusive, lower first. Where the contig ends sooner
-    the span stops there, and an element that runs on past that end, or a
-    tandem member beyond it, cannot be found.
-    """
-    if trna_strand == "+":
-        return trna_end, min(contig_len, trna_end + window_bp), trna_end + window_bp > contig_len
-    return max(1, trna_start - window_bp), trna_start, trna_start - window_bp < 1
-
-
 def closest_trna_rows(pairs: pd.DataFrame) -> pd.DataFrame:
     """One integrase-tRNA pair per integrase: the tRNA with the smallest ``distance``."""
     if pairs.empty or "distance" not in pairs.columns:
@@ -519,9 +504,6 @@ def evaluate_ie_candidate(
     aa_len = integrase_aa_length(
         integrase_start, integrase_end, integrase_protein_aa, thresholds.integrase_len_from
     )
-    window_lo, window_hi, window_cut = attl_search_window(
-        trna_start, trna_end, trna_strand, len(contig_seq), thresholds.attl_window_bp
-    )
     row: dict[str, Any] = {
         "integrase_id": integrase_id,
         "ie_id": "",
@@ -530,10 +512,6 @@ def evaluate_ie_candidate(
         "trna_end": trna_end,
         "trna_strand": trna_strand,
         "trna_len": trna_len,
-        # How much of the attL search window the contig held. Recorded for every
-        # candidate: "no attL" means little when the contig ended early.
-        "window_searched_bp": window_hi - window_lo + 1,
-        "window_truncated": window_cut,
         "integrase_len_aa": aa_len,
         "ie_len_nt": 0,
         # True until the element span is known, so an element without one never
