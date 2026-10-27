@@ -31,7 +31,7 @@ class SearchParamsFileTest(unittest.TestCase):
         self.assertEqual(t.attl_window_bp, 300000)
         self.assertEqual(t.attl_select_by, "bitscore")
         self.assertFalse(t.attl_reject_gapped)
-        self.assertEqual(t.trna_max_distance_bp, 500)
+        self.assertEqual(t.trna_max_distance_bp, 700)
 
     def test_code_defaults_match_the_file(self):
         self.assertEqual(load_thresholds(ROOT / "search_params.yaml"), FilterThresholds())

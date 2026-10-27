@@ -1,4 +1,4 @@
-"""Genome-coordinate GFF3 and GenBank for attL/attR."""
+"""Genome-coordinate GFF3 for attL/attR."""
 import sys
 import unittest
 from pathlib import Path
@@ -66,7 +66,6 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
                 integrases=tmp / "integrases.tsv",
                 trna=tmp / "trna.tsv",
                 out_gff3=tmp / "out.gff3",
-                out_gbk=tmp / "out.gbk",
                 out_tsv=tmp / "out.tsv",
                 sample="strain",
                 all_candidates=False,
@@ -87,15 +86,6 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
             self.assertIn("Note=attL", features[1][8])
             self.assertIn("Note=attR", features[2][8])
             self.assertIn("product=tRNA-Ile", features[2][8])
-            record = SeqIO.read(tmp / "out.gbk", "genbank")
-            notes = [" ".join(feat.qualifiers.get("note", [])) for feat in record.features]
-            self.assertIn("attL", notes)
-            attl = next(feat for feat in record.features if "attL" in feat.qualifiers.get("note", []))
-            self.assertEqual(int(attl.location.start), 9)
-            self.assertEqual(int(attl.location.end), 29)
-            self.assertEqual(attl.location.strand, 1)
-            element = next(feat for feat in record.features if feat.type == "mobile_element")
-            self.assertEqual(element.location.strand, 1)
             table = pd.read_csv(tmp / "out.tsv", sep="\t")
             self.assertEqual(list(table["integrase_id"]), ["contig1_1"])
             self.assertEqual(int(table.loc[0, "attL_start"]), 10)
@@ -112,7 +102,6 @@ class ExportGenomeFeaturesTest(unittest.TestCase):
                 integrases=tmp / "integrases.tsv",
                 trna=None,
                 out_gff3=tmp / "out.gff3",
-                out_gbk=tmp / "out.gbk",
                 out_tsv=tmp / "out.tsv",
                 sample="strain",
                 all_candidates=True,

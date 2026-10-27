@@ -1,7 +1,10 @@
 """Confident integrative-element cascade, in the order of the Results section.
 
 1. Integrase paired with an oppositely oriented tRNA, 3' ends within
-   ``trna_max_distance_bp`` (``annotate_trna_proximity.py``).
+   ``trna_max_distance_bp`` (``annotate_trna_proximity.py``). With
+   ``integrase_at: either``, an integrase left unpaired may instead sit at the
+   far end: on the tRNA's strand, its 3' end within ``trna_max_distance_bp``
+   of an attL copy of that tRNA's 3' end (``attl_side.py``).
 2. Exact duplication of the tRNA 3' end of at least ``attl_candidate_min_bp``
    (perfect run from the 3' anchor).
 3. Integrase longer than ``integrase_min_aa`` amino acids (measured as
@@ -40,7 +43,7 @@ import pandas as pd
 import yaml
 
 DEFAULT_SHIFT = 3
-DEFAULT_TRNA_MAX_DISTANCE_BP = 500
+DEFAULT_TRNA_MAX_DISTANCE_BP = 700
 DEFAULT_ATTL_WINDOW_BP = 300_000
 DEFAULT_ATTL_CANDIDATE_MIN_BP = 8
 DEFAULT_ATTL_EXACT_MIN_BP = 14
@@ -53,6 +56,12 @@ DEFAULT_INTEGRASE_HMM_CUTOFF = "ga"
 INTEGRASE_HMM_CUTOFF_CHOICES = ("ga", "none")
 DEFAULT_INTEGRASE_LEN_FROM = "protein"
 INTEGRASE_LEN_FROM_CHOICES = ("protein", "span")
+DEFAULT_INTEGRASE_AT = "either"
+INTEGRASE_AT_CHOICES = ("trna", "either")
+DEFAULT_TANDEM_SEARCH = True
+DEFAULT_TANDEM_WINDOW_BP = 60_000
+DEFAULT_TANDEM_MIN_ATT_BP = 30
+DEFAULT_TANDEM_MIN_ATT_PIDENT = 80
 
 
 @dataclass(frozen=True)
@@ -61,7 +70,11 @@ class FilterThresholds:
 
     Attributes:
         shift: Max distance (bp) between the BLAST hit end and the tRNA 3' end.
-        trna_max_distance_bp: Max distance between integrase and tRNA 3' ends.
+        trna_max_distance_bp: Max distance between the integrase 3' end and
+            the att site it faces: the tRNA 3' end, or attL.
+        integrase_at: ``trna`` pairs an integrase only with the tRNA it faces,
+            as the published finder did; ``either`` also takes an integrase at
+            the attL end, facing attL on the tRNA's strand.
         attl_window_bp: Genomic window searched for the attL duplication.
         attl_candidate_min_bp: Minimum length of the exact anchored run.
         attl_exact_min_bp: Exact-run length that passes the length gate.
@@ -81,10 +94,19 @@ class FilterThresholds:
         integrase_hmm_cutoff: ``ga`` keeps integrase hits at or above each
             profile's Pfam gathering threshold; ``none`` keeps every hit HMMER
             reports (E-value up to 10), as the published finder did.
+        tandem_search: Look for elements integrated one after another at the
+            same tRNA (``tandems.py``): split an element at an inner copy of
+            the tRNA 3' end, and add the elements past its attL.
+        tandem_window_bp: How far past the outermost attL of a tRNA's elements
+            further elements are looked for.
+        tandem_min_att_bp: A copy of the tRNA 3' end counts as a junction of a
+            tandem when its anchored hit is at least this long ...
+        tandem_min_att_pident: ... and at least this identical to the tRNA (%).
     """
 
     shift: int = DEFAULT_SHIFT
     trna_max_distance_bp: int = DEFAULT_TRNA_MAX_DISTANCE_BP
+    integrase_at: str = DEFAULT_INTEGRASE_AT
     attl_window_bp: int = DEFAULT_ATTL_WINDOW_BP
     attl_candidate_min_bp: int = DEFAULT_ATTL_CANDIDATE_MIN_BP
     attl_exact_min_bp: int = DEFAULT_ATTL_EXACT_MIN_BP
@@ -96,12 +118,17 @@ class FilterThresholds:
     reject_ambiguous_n_ie: bool = False
     attl_select_by: str = DEFAULT_ATTL_SELECT_BY
     integrase_hmm_cutoff: str = DEFAULT_INTEGRASE_HMM_CUTOFF
+    tandem_search: bool = DEFAULT_TANDEM_SEARCH
+    tandem_window_bp: int = DEFAULT_TANDEM_WINDOW_BP
+    tandem_min_att_bp: int = DEFAULT_TANDEM_MIN_ATT_BP
+    tandem_min_att_pident: int = DEFAULT_TANDEM_MIN_ATT_PIDENT
 
 
 # search_params.yaml key -> FilterThresholds field, in the order of that file.
 PARAM_FIELDS: dict[str, str] = {
     "integrase_hmm_cutoff": "integrase_hmm_cutoff",
     "trna_max_distance_bp": "trna_max_distance_bp",
+    "integrase_at": "integrase_at",
     "v3ps_shift": "shift",
     "attl_window_bp": "attl_window_bp",
     "attl_candidate_min_bp": "attl_candidate_min_bp",
@@ -113,12 +140,17 @@ PARAM_FIELDS: dict[str, str] = {
     "integrase_len_from": "integrase_len_from",
     "ie_min_nt": "ie_min_nt",
     "reject_ambiguous_n_ie": "reject_ambiguous_n_ie",
+    "tandem_search": "tandem_search",
+    "tandem_window_bp": "tandem_window_bp",
+    "tandem_min_att_bp": "tandem_min_att_bp",
+    "tandem_min_att_pident": "tandem_min_att_pident",
 }
-_BOOL_PARAMS = {"attl_reject_gapped", "reject_ambiguous_n_ie"}
+_BOOL_PARAMS = {"attl_reject_gapped", "reject_ambiguous_n_ie", "tandem_search"}
 _CHOICE_PARAMS = {
     "attl_select_by": ATTL_SELECT_CHOICES,
     "integrase_hmm_cutoff": INTEGRASE_HMM_CUTOFF_CHOICES,
     "integrase_len_from": INTEGRASE_LEN_FROM_CHOICES,
+    "integrase_at": INTEGRASE_AT_CHOICES,
 }
 
 

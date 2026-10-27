@@ -33,6 +33,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import yaml
 
 from annotate_mge_region import main as blast_attl_windows
+from attl_side import find_attl_side_pairs
 from annotate_trna_proximity import find_nearby_trnas, parse_integrases, parse_trna, write_results
 from export_genome_features import export_genome_features
 from extract_trna_region import extract_trna_sequence
@@ -45,6 +46,10 @@ from write_report import write_report
 
 ROOT = Path(__file__).resolve().parents[1]
 FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".fsa")
+# Written with the tandem search on: every element as a sequence (FASTA, GenBank), in
+# single_elements/ and tandem_elements/{full,split}/ of the output directory, and the
+# GenBank files of the single elements and tandem members together in all/.
+SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all")
 PFAM_PROFILES = (ROOT / "pfam" / "PF00589.hmm", ROOT / "pfam" / "PF22022.hmm")
 
 
@@ -179,6 +184,12 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
     step(sample, out, "blast_mge", blast_attl_windows,
          str(fasta), str(out / "mge_query.fa"), str(out / "mge_blast_raw.tsv"), str(out),
          window_size=t.attl_window_bp)
+    if t.integrase_at == "either":
+        # Integrases the first pairing left alone, paired through an attL next
+        # to their 3' end; appended to integrase_trna.tsv and mge_blast_raw.tsv.
+        step(sample, out, "attl_side", find_attl_side_pairs,
+             fasta, out / "integrase_hits_summary.tsv", out / "trna.tsv",
+             out / "integrase_trna.tsv", out / "mge_blast_raw.tsv", out, t)
     step(sample, out, "filter_confident_ie", filter_sample,
          sample=sample,
          trna_path=out / "integrase_trna.tsv",
@@ -194,10 +205,11 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
          integrases=out / "integrase_hits_summary.tsv",
          trna=out / "integrase_trna.tsv",
          out_gff3=out / f"{sample}.ie.gff3",
-         out_gbk=out / f"{sample}.ie.gbk",
          out_tsv=out / "attachment_sites_genome.tsv",
          sample=sample,
-         all_candidates=run.all_candidates)
+         all_candidates=run.all_candidates,
+         tandems=t.tandem_search,
+         out_sequences=out / "sequences")
 
 
 def upstream_commit() -> str:
@@ -212,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("input", type=Path, help="Assembly FASTA, or a directory of them")
     parser.add_argument("outdir", type=Path, nargs="?", default=ROOT / "outdir",
-                        help="Where the GFF3, GenBank and report go (default: outdir/ in this repository)")
+                        help="Where the GFF3, report and element sequences go (default: outdir/ in this repository)")
     parser.add_argument("--cores", "-j", type=int, default=os.cpu_count() or 1,
                         help="Genomes processed at the same time (default: all CPUs)")
     parser.add_argument("--search-params", type=Path, default=None,
@@ -271,10 +283,13 @@ def main(argv: list[str] | None = None) -> int:
         for sample in samples:
             sample_dir = results / sample
             if sample not in failed:
-                for suffix in (".ie.gff3", ".ie.gbk"):
-                    shutil.copyfile(sample_dir / f"{sample}{suffix}", outdir / f"{sample}{suffix}")
+                shutil.copyfile(sample_dir / f"{sample}.ie.gff3", outdir / f"{sample}.ie.gff3")
                 print(f"GFF3:    {outdir / f'{sample}.ie.gff3'}")
-                print(f"GenBank: {outdir / f'{sample}.ie.gbk'}")
+                if thresholds.tandem_search:
+                    for name in SEQUENCE_DIRS:
+                        if (sample_dir / "sequences" / name).is_dir():
+                            shutil.copytree(sample_dir / "sequences" / name, outdir / name, dirs_exist_ok=True)
+                    print(f"Sequences: {', '.join(str(outdir / name) for name in SEQUENCE_DIRS)}")
             # A report is written whenever there are tables to report on, so a
             # failed genome still says how far it got.
             if (sample_dir / "integrase_hits_summary.tsv").is_file() or (sample_dir / "ie_filter_audit.tsv").is_file():
