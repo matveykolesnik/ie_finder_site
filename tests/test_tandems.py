@@ -200,13 +200,24 @@ class WriteTest(unittest.TestCase):
     # search window was cut there, as the cascade would record.
     CUT = {"window_truncated": True, "window_searched_bp": 28924}
 
+    def test_cut_window_is_left_out_by_default(self):
+        rows = [{**row(False, (10001, 10045)), **self.CUT}]
+        self.assertEqual(run(rows, False, with_b=False), [])
+        elements, records = self.elements(rows)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            self.assertEqual(write_sequences(out, elements, records, "s"), (0, 0))
+            self.assertEqual(list(out.iterdir()), [])
+            write_gff3(out / "s.gff3", elements, records)
+            self.assertIn(";window_truncated=true", (out / "s.gff3").read_text())
+
     def test_cut_window_goes_to_truncated_elements(self):
         rows = [{**row(False, (10001, 10045)), **self.CUT}]
         self.assertEqual(run(rows, False, with_b=False), [])
         elements, records = self.elements(rows)
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            self.assertEqual(write_sequences(out, elements, records, "s"), (1, 0))
+            self.assertEqual(write_sequences(out, elements, records, "s", truncated_elements=True), (1, 0))
             cut = out / "truncated_elements" / "single_elements"
             self.assertEqual(sorted(p.name for p in cut.iterdir()), ["s_IE1.fna", "s_IE1.gbk"])
             self.assertIn("attL search window cut by the contig end", (cut / "s_IE1.fna").read_text())
@@ -223,7 +234,9 @@ class WriteTest(unittest.TestCase):
         self.assertEqual([e["window_truncated"] for e in elements], [True, True])
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            self.assertEqual(write_sequences(out, elements, records, "s"), (0, 1))
+            self.assertEqual(write_sequences(out, elements, records, "s"), (0, 0))
+            self.assertEqual(list(out.iterdir()), [])
+            self.assertEqual(write_sequences(out, elements, records, "s", truncated_elements=True), (0, 1))
             cut = out / "truncated_elements" / "tandem_elements"
             self.assertEqual(sorted(p.name for p in (cut / "full").iterdir()), ["s_TA1.fna", "s_TA1.gbk"])
             self.assertEqual(len(list((cut / "split").glob("*.fna"))), 2)

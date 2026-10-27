@@ -6,6 +6,7 @@
 #   ./run.sh genomes_dir outdir --cores 8
 #   ANNOTATE_ALL=1 ./run.sh strain.fasta outdir
 #   KEEP_WORK=1 ./run.sh strain.fasta outdir
+#   TRUNCATED_ELEMENTS=1 ./run.sh strain.fasta outdir
 #   SEARCH_PARAMS=strict.yaml ./run.sh strain.fasta outdir
 #
 # The first run creates the conda environment named in envs/IE_finder.yaml
@@ -122,5 +123,8 @@ if [[ "${ANNOTATE_ALL:-0}" == "1" ]]; then
 fi
 if [[ "${KEEP_WORK:-0}" == "1" ]]; then
   flags+=(--keep-work)
+fi
+if [[ "${TRUNCATED_ELEMENTS:-0}" == "1" ]]; then
+  flags+=(--truncated-elements)
 fi
 exec python3 "$SCRIPT_DIR/scripts/ie_finder.py" "$@" ${flags[@]+"${flags[@]}"}

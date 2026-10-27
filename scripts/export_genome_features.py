@@ -16,9 +16,9 @@ from the tRNA, so an element at a minus-strand tRNA is reverse-complemented; the
 headers give the contig coordinates.
 
 An element whose attL search window ran into a contig end carries
-``window_truncated=true``, and its sequences go under ``truncated_elements/``
-rather than beside the others: a longer element, or a further tandem member,
-may lie past that end.
+``window_truncated=true``: a longer element, or a further tandem member, may lie
+past that end. Its sequences are left out, or with ``truncated_elements`` written
+under ``truncated_elements/``, apart from the others.
 """
 
 from __future__ import annotations
@@ -390,7 +390,8 @@ TANDEM_FULL_DIR = Path("tandem_elements") / "full"
 TANDEM_SPLIT_DIR = Path("tandem_elements") / "split"
 # Every single element and every tandem member, as GenBank only: one file per element.
 ALL_DIR = Path("all")
-# Elements whose attL search window ran into a contig end, laid out as above (no all/).
+# Elements whose attL search window ran into a contig end, laid out as above (no all/),
+# when they are written at all.
 TRUNCATED_DIR = Path("truncated_elements")
 
 
@@ -456,7 +457,13 @@ def _write_pair(directory: Path, record: SeqRecord, header: str) -> None:
         f">{header}\n" + "".join(seq[i:i + 80] + "\n" for i in range(0, len(seq), 80)))
 
 
-def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqRecord], sample: str) -> tuple[int, int]:
+def write_sequences(
+    out_dir: Path,
+    elements: list[dict],
+    records: dict[str, SeqRecord],
+    sample: str,
+    truncated_elements: bool = False,
+) -> tuple[int, int]:
     """Every element as a sequence of its own, sorted by tandem membership.
 
     Writes, under ``out_dir``, one GenBank and one FASTA file per sequence:
@@ -468,16 +475,19 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
     - ``all/<sample>_<IE>.gbk``: the single elements and the tandem members
       together, GenBank only, the same files as in the two directories above.
 
-    Elements whose attL search window ran into a contig end go to
-    ``truncated_elements/single_elements/`` and ``truncated_elements/tandem_elements/``
-    instead, and not to ``all/``; a tandem goes there whole when any member's did.
+    Elements whose attL search window ran into a contig end are left out; with
+    ``truncated_elements`` they go to ``truncated_elements/single_elements/`` and
+    ``truncated_elements/tandem_elements/`` instead, and not to ``all/``. A tandem
+    counts as cut when any member's window was.
 
-    All are read outwards from the tRNA. Returns (single elements, tandems),
-    those under ``truncated_elements/`` included.
+    All are read outwards from the tRNA. Returns (single elements, tandems)
+    written, those under ``truncated_elements/`` included.
     """
     n_single = 0
     for m in elements:
         if m.get("tandem"):
+            continue
+        if m.get("window_truncated") and not truncated_elements:
             continue
         plus = m["trna_strand"] != "-"
         where = f"{m['contig']}:{m['ie_start']}-{m['ie_end']}({'+' if plus else '-'})"
@@ -493,14 +503,18 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
             _write_gbk(out_dir / ALL_DIR, record)
         n_single += 1
     groups = tandem_groups(elements)
+    n_tandems = 0
     for name, members in groups.items():
+        cut = any(m.get("window_truncated") for m in members)
+        if cut and not truncated_elements:
+            continue
+        n_tandems += 1
         contig = members[0]["contig"]
         plus = members[0]["trna_strand"] != "-"
         lo = min(m["ie_start"] for m in members)
         hi = max(m["ie_end"] for m in members)
         where = f"{contig}:{lo}-{hi}({'+' if plus else '-'})"
         trna = members[0]["attR_type"]
-        cut = any(m.get("window_truncated") for m in members)
         base = out_dir / TRUNCATED_DIR if cut else out_dir
         cut_bit = f"; {WINDOW_CUT_NOTE}" if cut else ""
         record = _cut(name, f"{sample}_{name}", lo, hi, plus, members, records[contig],
@@ -524,7 +538,7 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
                         + (f" found_by={m['found_by']}" if m.get("found_by") else "") + cut_bit)
             if not cut:
                 _write_gbk(out_dir / ALL_DIR, part)
-    return n_single, len(groups)
+    return n_single, n_tandems
 
 
 def export_genome_features(
@@ -539,9 +553,11 @@ def export_genome_features(
     all_candidates: bool,
     tandems: bool = False,
     out_sequences: Path | None = None,
+    truncated_elements: bool = False,
 ) -> int:
     """Write GFF3 and a coordinate table; with ``tandems``, the element sequences too
-    (``write_sequences``, under ``out_sequences``).
+    (``write_sequences``, under ``out_sequences``; with ``truncated_elements``, those
+    of elements whose attL search window ran into a contig end as well).
 
     Returns the element count.
     """
@@ -558,8 +574,12 @@ def export_genome_features(
     write_table(out_tsv, elements, tandems)
     logger.info(f"{sample}: {len(elements)} element(s) -> {out_gff3.name}")
     if tandems and out_sequences is not None:
-        n_single, n_tandems = write_sequences(out_sequences, elements, records, sample)
-        logger.info(f"{sample}: {n_single} single element(s), {n_tandems} tandem(s) -> {out_sequences}")
+        n_single, n_tandems = write_sequences(out_sequences, elements, records, sample, truncated_elements)
+        n_cut = sum(1 for m in elements if m.get("window_truncated"))
+        logger.info(f"{sample}: {n_single} single element(s), {n_tandems} tandem(s) -> {out_sequences}"
+                    + (f"; {n_cut} element(s) with a cut attL search window "
+                       + ("under truncated_elements/" if truncated_elements else "left out")
+                       if n_cut else ""))
     return len(elements)
 
 

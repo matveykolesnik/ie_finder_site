@@ -49,7 +49,8 @@ FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".fsa")
 # Written with the tandem search on: every element as a sequence (FASTA, GenBank), in
 # single_elements/ and tandem_elements/{full,split}/ of the output directory, and the
 # GenBank files of the single elements and tandem members together in all/. Elements
-# whose attL search window ran into a contig end go to truncated_elements/ instead.
+# whose attL search window ran into a contig end are left out, or with
+# --truncated-elements written to truncated_elements/.
 SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all", "truncated_elements")
 PFAM_PROFILES = (ROOT / "pfam" / "PF00589.hmm", ROOT / "pfam" / "PF22022.hmm")
 
@@ -76,6 +77,7 @@ class Run:
     thresholds: FilterThresholds
     params_used: Path
     all_candidates: bool
+    truncated_elements: bool = False
 
 
 def collect_inputs(path: Path) -> dict[str, Path]:
@@ -210,7 +212,8 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
          sample=sample,
          all_candidates=run.all_candidates,
          tandems=t.tandem_search,
-         out_sequences=out / "sequences")
+         out_sequences=out / "sequences",
+         truncated_elements=run.truncated_elements)
 
 
 def upstream_commit() -> str:
@@ -234,6 +237,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="Also write candidates that have attL but failed a later filter")
     parser.add_argument("--keep-work", action="store_true",
                         help="Keep the temporary work directory")
+    parser.add_argument("--truncated-elements", action="store_true",
+                        help="Also write the sequences of elements whose attL search window ran into "
+                             "a contig end, into truncated_elements/ (by default they are only in the GFF3)")
     args = parser.parse_args(argv)
 
     try:
@@ -261,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
         hmm = results / "combined" / "pfam_combined.hmm"
         hmm.parent.mkdir(parents=True)
         hmm.write_text("".join(p.read_text() for p in PFAM_PROFILES))
-        run = Run(results, hmm, thresholds, params_used, args.all_candidates)
+        run = Run(results, hmm, thresholds, params_used, args.all_candidates, args.truncated_elements)
 
         failures: list[StepFailed] = []
         workers = max(1, min(args.cores, len(samples)))

@@ -83,7 +83,7 @@ outdir/
 │       └── TTHB27c_IE2.fna, TTHB27c_IE2.gbk, ...
 ├── all/                          every element above: single ones and tandem members
 │   └── TTHB27c_IE1.gbk, TTHB27c_IE2.gbk, ...
-└── truncated_elements/           elements whose attL search window ran into a contig end
+└── truncated_elements/           with TRUNCATED_ELEMENTS=1: elements whose attL search window ran into a contig end
     ├── single_elements/
     │   └── TTHB27c_IE3.fna, TTHB27c_IE3.gbk, ...
     └── tandem_elements/
@@ -93,7 +93,7 @@ outdir/
 
 - **One FASTA and one GenBank file per sequence**, named after the sample and the element or tandem. Genomes share these directories, so the sample name keeps the files apart.
 - **`all/` holds GenBank files only**: the files of `single_elements/` and `tandem_elements/split/` again, one per element, for tools that take a directory of elements. Whole tandems are not in it, nor anything from `truncated_elements/`.
-- **`truncated_elements/`** holds the elements whose attL search window, `attl_window_bp` on the tRNA's 3′ side, runs past the end of the contig, in the same layout as above. The element itself is bounded by its attR and attL, but a longer one, or a further member of its tandem, could lie past that end, on another contig. A tandem goes there whole when its tRNA's window was cut. In the GFF3 these elements carry `window_truncated=true`. On a complete circular chromosome the first and last base count as ends too: the search does not wrap around them.
+- **Elements whose attL search window ran into a contig end** get no sequence files by default. The window is `attl_window_bp` on the tRNA's 3′ side; the element itself is bounded by its attR and attL, but a longer one, or a further member of its tandem, could lie past that end, on another contig. These elements stay in the GFF3, with `window_truncated=true`, and in the report. With `TRUNCATED_ELEMENTS=1` their sequences are written to `truncated_elements/`, in the same layout as above, a tandem whole when its tRNA's window was cut. On a complete circular chromosome the first and last base count as ends too: the search does not wrap around them.
 - **The GenBank files carry features.** Each marks its element (`mobile_element`; in a whole tandem, one per member), attR and attL (`misc_feature`) and the integrase (`CDS`).
 - **The FASTA headers** give the contig span and the tRNA. A whole tandem's header also gives each member's span on it; a member's header gives its tandem and place (k/n).
 - **Orientation.** Every sequence is read outwards from the tRNA, so one at a minus-strand tRNA is reverse-complemented, with its features turned with it.
@@ -118,7 +118,7 @@ Attributes that appear on an element only where they apply:
 - `attR_after=IE<n>` when it integrated into the copy of the tRNA 3′ end that element IE<n> left. Elements integrated one after another into one tRNA are delimited by consecutive copies, so its attR is that copy, not the tRNA.
 - `tandem=TA<n>` and `tandem_member=k/m` on each member of a tandem, k counted outwards from the tRNA.
 - `found_by=tandem` on a member that only the tandem search found.
-- `window_truncated=true` when its attL search window ran into the end of the contig; its sequences are in `truncated_elements/`.
+- `window_truncated=true` when its attL search window ran into the end of the contig; its sequences are written only with `TRUNCATED_ELEMENTS=1`, to `truncated_elements/`.
 
 An element found from both ends (an integrase at each) is written once.
 
@@ -129,6 +129,7 @@ Intermediate tables and BLAST output are written to a temporary directory and re
 ```bash
 ANNOTATE_ALL=1 ./run.sh TTHB27c.fasta outdir
 KEEP_WORK=1 ./run.sh TTHB27c.fasta outdir
+TRUNCATED_ELEMENTS=1 ./run.sh TTHB27c.fasta outdir
 SEARCH_PARAMS=strict.yaml ./run.sh TTHB27c.fasta outdir
 ./run.sh TTHB27c.fasta outdir --cores 8
 ```
@@ -139,6 +140,8 @@ No activation step. `./run.sh` puts `IE_finder_site` on `PATH` for that run. Aft
 
 `KEEP_WORK=1` leaves the temporary directory. The path is printed only when a run fails or when this flag is set. Use it to see the raw tables behind the report.
 
+`TRUNCATED_ELEMENTS=1` also writes the sequences of elements whose attL search window ran into a contig end, into `truncated_elements/` (see above). Without it they are only in the GFF3 and the report.
+
 `SEARCH_PARAMS=strict.yaml` reads search thresholds from that file on top of `search_params.yaml`. Keys set in it win, and keys left out keep their values from `search_params.yaml`. An unknown key or a bad value stops the run before any step starts. For example, a file with these four lines brings back the published rules:
 
 ```yaml
@@ -148,7 +151,7 @@ attl_select_by: length
 attl_reject_gapped: true
 ```
 
-`--cores N` sets how many genomes are processed at the same time; the default is one per CPU. Each genome runs its steps in order. Arguments after the input are passed to `scripts/ie_finder.py`, which also takes the options above as `--all-candidates`, `--keep-work` and `--search-params FILE` (see `scripts/ie_finder.py --help`).
+`--cores N` sets how many genomes are processed at the same time; the default is one per CPU. Each genome runs its steps in order. Arguments after the input are passed to `scripts/ie_finder.py`, which also takes the options above as `--all-candidates`, `--keep-work`, `--truncated-elements` and `--search-params FILE` (see `scripts/ie_finder.py --help`).
 
 If a step fails for one genome, the other genomes still finish and get their files. The failed genome gets a report that shows how far it got, the failing step's log is printed, the temporary directory is kept, and the run exits with status 1.
 
