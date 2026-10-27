@@ -48,8 +48,9 @@ ROOT = Path(__file__).resolve().parents[1]
 FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".fsa")
 # Written with the tandem search on: every element as a sequence (FASTA, GenBank), in
 # single_elements/ and tandem_elements/{full,split}/ of the output directory, and the
-# GenBank files of the single elements and tandem members together in all/.
-SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all")
+# GenBank files of the single elements and tandem members together in all/. Elements
+# whose attL search window ran into a contig end go to truncated_elements/ instead.
+SEQUENCE_DIRS = ("single_elements", "tandem_elements", "all", "truncated_elements")
 PFAM_PROFILES = (ROOT / "pfam" / "PF00589.hmm", ROOT / "pfam" / "PF22022.hmm")
 
 
@@ -286,10 +287,11 @@ def main(argv: list[str] | None = None) -> int:
                 shutil.copyfile(sample_dir / f"{sample}.ie.gff3", outdir / f"{sample}.ie.gff3")
                 print(f"GFF3:    {outdir / f'{sample}.ie.gff3'}")
                 if thresholds.tandem_search:
-                    for name in SEQUENCE_DIRS:
-                        if (sample_dir / "sequences" / name).is_dir():
-                            shutil.copytree(sample_dir / "sequences" / name, outdir / name, dirs_exist_ok=True)
-                    print(f"Sequences: {', '.join(str(outdir / name) for name in SEQUENCE_DIRS)}")
+                    written = [name for name in SEQUENCE_DIRS if (sample_dir / "sequences" / name).is_dir()]
+                    for name in written:
+                        shutil.copytree(sample_dir / "sequences" / name, outdir / name, dirs_exist_ok=True)
+                    if written:
+                        print(f"Sequences: {', '.join(str(outdir / name) for name in written)}")
             # A report is written whenever there are tables to report on, so a
             # failed genome still says how far it got.
             if (sample_dir / "integrase_hits_summary.tsv").is_file() or (sample_dir / "ie_filter_audit.tsv").is_file():

@@ -14,6 +14,11 @@ sequence of its own, FASTA and GenBank, sorted into single elements, tandems
 whole and tandem members (``write_sequences``). The sequences are read outwards
 from the tRNA, so an element at a minus-strand tRNA is reverse-complemented; the
 headers give the contig coordinates.
+
+An element whose attL search window ran into a contig end carries
+``window_truncated=true``, and its sequences go under ``truncated_elements/``
+rather than beside the others: a longer element, or a further tandem member,
+may lie past that end.
 """
 
 from __future__ import annotations
@@ -52,6 +57,7 @@ TSV_COLUMNS = [
     "confidence",
     "integrase_at",
     "attR_after",
+    "window_truncated",
 ]
 TANDEM_COLUMNS = ["element", "tandem", "tandem_member", "found_by"]
 
@@ -245,6 +251,7 @@ def build_elements(
             "tandem": _text_field(row, "tandem"),
             "tandem_member": _text_field(row, "tandem_member"),
             "found_by": _text_field(row, "found_by"),
+            "window_truncated": "window_truncated" in row.index and as_bool(row["window_truncated"]),
         })
     elements.sort(key=lambda item: (item["contig"], item["ie_start"], item["integrase_id"]))
     for index, item in enumerate(elements, start=1):
@@ -274,6 +281,9 @@ def _text_field(row: pd.Series, column: str) -> str:
     return str(row[column]).strip()
 
 
+WINDOW_CUT_NOTE = "attL search window cut by the contig end"
+
+
 def _extra_notes(item: dict) -> list[str]:
     """What sets an element apart from the usual layout, if anything."""
     notes = []
@@ -285,6 +295,8 @@ def _extra_notes(item: dict) -> list[str]:
         notes.append(f"member {item['tandem_member']} of tandem {item['tandem']}")
     if item.get("found_by"):
         notes.append(f"found by the {item['found_by']} search")
+    if item.get("window_truncated"):
+        notes.append(WINDOW_CUT_NOTE)
     return notes
 
 
@@ -318,6 +330,8 @@ def write_gff3(path: Path, elements: list[dict], records: dict[str, SeqRecord]) 
             parent += f";tandem={item['tandem']};tandem_member={item['tandem_member']}"
         if item.get("found_by"):
             parent += f";found_by={gff_escape(item['found_by'])}"
+        if item.get("window_truncated"):
+            parent += ";window_truncated=true"
         lines.append(_gff_line(
             item["contig"], "mobile_genetic_element",
             item["ie_start"], item["ie_end"], item["ie_strand"], parent,
@@ -376,6 +390,8 @@ TANDEM_FULL_DIR = Path("tandem_elements") / "full"
 TANDEM_SPLIT_DIR = Path("tandem_elements") / "split"
 # Every single element and every tandem member, as GenBank only: one file per element.
 ALL_DIR = Path("all")
+# Elements whose attL search window ran into a contig end, laid out as above (no all/).
+TRUNCATED_DIR = Path("truncated_elements")
 
 
 def _cut(
@@ -452,7 +468,12 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
     - ``all/<sample>_<IE>.gbk``: the single elements and the tandem members
       together, GenBank only, the same files as in the two directories above.
 
-    All are read outwards from the tRNA. Returns (single elements, tandems).
+    Elements whose attL search window ran into a contig end go to
+    ``truncated_elements/single_elements/`` and ``truncated_elements/tandem_elements/``
+    instead, and not to ``all/``; a tandem goes there whole when any member's did.
+
+    All are read outwards from the tRNA. Returns (single elements, tandems),
+    those under ``truncated_elements/`` included.
     """
     n_single = 0
     for m in elements:
@@ -464,10 +485,12 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
                       records[m["contig"]],
                       f"{sample} integrative element {m['name']} at {m['attR_type'] or 'a tRNA'}, {where}, "
                       f"read outwards from the tRNA", False)
-        _write_pair(out_dir / SINGLE_DIR, record,
+        base = out_dir / TRUNCATED_DIR if m.get("window_truncated") else out_dir
+        _write_pair(base / SINGLE_DIR, record,
                     f"{record.id} {where} {m['attR_type']} confidence={m['confidence']}"
                     + "".join(f"; {n}" for n in _extra_notes(m)))
-        _write_gbk(out_dir / ALL_DIR, record)
+        if not m.get("window_truncated"):
+            _write_gbk(out_dir / ALL_DIR, record)
         n_single += 1
     groups = tandem_groups(elements)
     for name, members in groups.items():
@@ -477,6 +500,9 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
         hi = max(m["ie_end"] for m in members)
         where = f"{contig}:{lo}-{hi}({'+' if plus else '-'})"
         trna = members[0]["attR_type"]
+        cut = any(m.get("window_truncated") for m in members)
+        base = out_dir / TRUNCATED_DIR if cut else out_dir
+        cut_bit = f"; {WINDOW_CUT_NOTE}" if cut else ""
         record = _cut(name, f"{sample}_{name}", lo, hi, plus, members, records[contig],
                       f"{sample} tandem {name} at {trna or 'a tRNA'}, {where}, read outwards from the tRNA: "
                       + ", ".join(m["name"] for m in members), True)
@@ -485,17 +511,19 @@ def write_sequences(out_dir: Path, elements: list[dict], records: dict[str, SeqR
             a, b = ((m["ie_start"] - lo + 1, m["ie_end"] - lo + 1) if plus
                     else (hi - m["ie_end"] + 1, hi - m["ie_start"] + 1))
             spans.append(f"{m['name']}:{a}-{b}")
-        _write_pair(out_dir / TANDEM_FULL_DIR, record, f"{record.id} {where} {trna} members {','.join(spans)}")
+        _write_pair(base / TANDEM_FULL_DIR, record,
+                    f"{record.id} {where} {trna} members {','.join(spans)}{cut_bit}")
         for m in members:
             m_where = f"{m['contig']}:{m['ie_start']}-{m['ie_end']}({'+' if plus else '-'})"
             part = _cut(m["name"], f"{sample}_{m['name']}", m["ie_start"], m["ie_end"], plus, [m],
                         records[contig],
                         f"{sample} integrative element {m['name']}, member {m['tandem_member']} of tandem {name} "
                         f"at {trna or 'a tRNA'}, {m_where}, read outwards from the tRNA", False)
-            _write_pair(out_dir / TANDEM_SPLIT_DIR, part,
+            _write_pair(base / TANDEM_SPLIT_DIR, part,
                         f"{part.id} tandem={sample}_{name} member={m['tandem_member']} {m_where} {trna}"
-                        + (f" found_by={m['found_by']}" if m.get("found_by") else ""))
-            _write_gbk(out_dir / ALL_DIR, part)
+                        + (f" found_by={m['found_by']}" if m.get("found_by") else "") + cut_bit)
+            if not cut:
+                _write_gbk(out_dir / ALL_DIR, part)
     return n_single, len(groups)
 
 

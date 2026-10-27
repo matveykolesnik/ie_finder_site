@@ -81,12 +81,19 @@ outdir/
 │   │   └── TTHB27c_TA1.fna, TTHB27c_TA1.gbk, ...
 │   └── split/                    each member of a tandem alone
 │       └── TTHB27c_IE2.fna, TTHB27c_IE2.gbk, ...
-└── all/                          every element: single ones and tandem members
-    └── TTHB27c_IE1.gbk, TTHB27c_IE2.gbk, ...
+├── all/                          every element above: single ones and tandem members
+│   └── TTHB27c_IE1.gbk, TTHB27c_IE2.gbk, ...
+└── truncated_elements/           elements whose attL search window ran into a contig end
+    ├── single_elements/
+    │   └── TTHB27c_IE3.fna, TTHB27c_IE3.gbk, ...
+    └── tandem_elements/
+        ├── full/
+        └── split/
 ```
 
 - **One FASTA and one GenBank file per sequence**, named after the sample and the element or tandem. Genomes share these directories, so the sample name keeps the files apart.
-- **`all/` holds GenBank files only**: the files of `single_elements/` and `tandem_elements/split/` again, one per element, for tools that take a directory of elements. Whole tandems are not in it.
+- **`all/` holds GenBank files only**: the files of `single_elements/` and `tandem_elements/split/` again, one per element, for tools that take a directory of elements. Whole tandems are not in it, nor anything from `truncated_elements/`.
+- **`truncated_elements/`** holds the elements whose attL search window, `attl_window_bp` on the tRNA's 3′ side, runs past the end of the contig, in the same layout as above. The element itself is bounded by its attR and attL, but a longer one, or a further member of its tandem, could lie past that end, on another contig. A tandem goes there whole when its tRNA's window was cut. In the GFF3 these elements carry `window_truncated=true`. On a complete circular chromosome the first and last base count as ends too: the search does not wrap around them.
 - **The GenBank files carry features.** Each marks its element (`mobile_element`; in a whole tandem, one per member), attR and attL (`misc_feature`) and the integrase (`CDS`).
 - **The FASTA headers** give the contig span and the tRNA. A whole tandem's header also gives each member's span on it; a member's header gives its tandem and place (k/n).
 - **Orientation.** Every sequence is read outwards from the tRNA, so one at a minus-strand tRNA is reverse-complemented, with its features turned with it.
@@ -111,6 +118,7 @@ Attributes that appear on an element only where they apply:
 - `attR_after=IE<n>` when it integrated into the copy of the tRNA 3′ end that element IE<n> left. Elements integrated one after another into one tRNA are delimited by consecutive copies, so its attR is that copy, not the tRNA.
 - `tandem=TA<n>` and `tandem_member=k/m` on each member of a tandem, k counted outwards from the tRNA.
 - `found_by=tandem` on a member that only the tandem search found.
+- `window_truncated=true` when its attL search window ran into the end of the contig; its sequences are in `truncated_elements/`.
 
 An element found from both ends (an integrase at each) is written once.
 
@@ -149,8 +157,8 @@ If a step fails for one genome, the other genomes still finish and get their fil
 `strain.ie.report.txt` is the log for that genome. It has five blocks:
 
 - `search_params` — the thresholds this run used, after any `SEARCH_PARAMS` override
-- `counts` — integrase HMM hits, integrase–tRNA pairs, attL BLAST hits, how many passed
-- `candidates` — one line each: `confident` or `rejected` plus the first failing reason (`exact_run_too_short`, a CDS overlap, an integrase shorter than 300 aa, a gapped alignment)
+- `counts` — integrase HMM hits, integrase–tRNA pairs, attL BLAST hits, how many passed, and how many confident and rejected candidates had their attL search window cut by a contig end. A rejected candidate with a cut window may be an element that continues on another contig, not a pair without one
+- `candidates` — one line each: `confident` or `rejected` plus the first failing reason (`exact_run_too_short`, a CDS overlap, an integrase shorter than 300 aa, a gapped alignment); a candidate whose window was cut says so, with how many bases were searched
 - `published_coordinates` and `audit` — the full tables, so a rejected locus can be reconstructed without the temporary files; with the tandem search, `published_coordinates` also gives each element's name and tandem
 - `tandems` — with the tandem search, one line per tandem: contig, span, tRNA strand and type, and its members outwards from the tRNA
 - `logs` — stdout of the steps that printed something. Empty logs are omitted
