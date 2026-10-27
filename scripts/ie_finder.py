@@ -182,8 +182,8 @@ def run_sample(sample: str, fasta: Path, run: Run) -> None:
     step(sample, out, "extract_trna_region", extract_trna_sequence,
          str(fasta), str(out / "integrase_trna.tsv"), str(out / "mge_query.fa"))
     step(sample, out, "blast_mge", blast_attl_windows,
-         str(fasta), str(out / "mge_query.fa"), str(out / "mge_blast_raw.tsv"), str(out),
-         window_size=t.attl_window_bp)
+         str(fasta), str(out / "mge_query.fa"), str(out / "integrase_trna.tsv"),
+         str(out / "mge_blast_raw.tsv"), str(out), window_size=t.attl_window_bp)
     if t.integrase_at == "either":
         # Integrases the first pairing left alone, paired through an attL next
         # to their 3' end; appended to integrase_trna.tsv and mge_blast_raw.tsv.

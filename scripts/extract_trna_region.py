@@ -8,7 +8,7 @@ from Bio.SeqRecord import SeqRecord
 
 from genome import contig_record, read_genome
 from logger import get_logger
-from v3ps_filters import closest_trna_rows
+from v3ps_filters import build_qseqid, closest_trna_rows
 
 logger = get_logger("extract_trna_region")
 
@@ -55,7 +55,7 @@ def extract_trna_sequence(genome_fasta, trna_table_path, out_fa):
             logger.warning(f"Empty sequence for {integrase_id}|{contig}|{start}-{end}|{strand}, skipping")
             continue
 
-        header = f"{integrase_id}:{contig}:{start}-{end}:{strand}"
+        header = build_qseqid(str(integrase_id), contig, start, end, strand)
         records.append(SeqRecord(seq, id=header, description=""))
 
     with open(out_fa, "w") as f:

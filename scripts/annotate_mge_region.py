@@ -19,7 +19,7 @@ from Bio.SeqRecord import SeqRecord
 
 from genome import contig_record, read_genome
 from logger import get_logger
-from v3ps_filters import DEFAULT_ATTL_WINDOW_BP, load_thresholds
+from v3ps_filters import DEFAULT_ATTL_WINDOW_BP, build_qseqid, closest_trna_rows, load_thresholds
 
 logger = get_logger("annotate_mge_region")
 
@@ -43,15 +43,20 @@ def run_blast_on_region(
         tmp_dir: Directory for the temporary query, subject and output files.
 
     Returns:
-        BLAST hits as a DataFrame with columns listed in ``BLAST_COLS``.
+        BLAST hits as a DataFrame with columns listed in ``BLAST_COLS``; ``qseqid``
+        is the id of the query record, whatever characters it holds.
         Returns an empty DataFrame when BLAST produces no alignments.
     """
+    queries = query_rec if isinstance(query_rec, list) else [query_rec]
+    # BLAST sees plain ids and the hits get the records' own back, so an id
+    # with ':' or '|' in it reaches the caller unchanged.
+    plain = {f"q{i}": q.id for i, q in enumerate(queries)}
     with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp:
         qfa = os.path.join(tmp, "query.fa")
         sfa = os.path.join(tmp, "subject.fa")
         bout = os.path.join(tmp, "blast.tsv")
 
-        SeqIO.write(query_rec if isinstance(query_rec, list) else [query_rec], qfa, "fasta")
+        SeqIO.write([SeqRecord(q.seq, id=key, description="") for key, q in zip(plain, queries)], qfa, "fasta")
         SeqIO.write([SeqRecord(subject_seq, id="subject", description="")], sfa, "fasta")
 
         subprocess.run(
@@ -67,14 +72,35 @@ def run_blast_on_region(
         )
 
         try:
-            return pd.read_csv(bout, sep="\t", header=None, names=BLAST_COLS)
+            hits = pd.read_csv(bout, sep="\t", header=None, names=BLAST_COLS, dtype={"qseqid": str})
         except pd.errors.EmptyDataError:
             return pd.DataFrame(columns=BLAST_COLS)
+    hits["qseqid"] = hits["qseqid"].map(plain)
+    return hits
+
+
+def read_pairs(pairs_tsv: str) -> dict[str, tuple[str, str, int, int, str]]:
+    """Query id -> (integrase id, contig, tRNA start, tRNA end, tRNA strand).
+
+    The pairs are those ``extract_trna_region`` writes as queries, under the
+    same ids. The id is only looked up here, never split: a contig name may
+    hold the ':' that separates its fields.
+    """
+    pairs = pd.read_csv(pairs_tsv, sep="\t", dtype={"contig": str})
+    out = {}
+    for _, row in closest_trna_rows(pairs).iterrows():
+        fields = (
+            str(row["integrase_id"]), str(row["contig"]).strip(),
+            int(row["trna_start"]), int(row["trna_end"]), str(row["trna_strand"]).strip(),
+        )
+        out[build_qseqid(*fields)] = fields
+    return out
 
 
 def main(
     genome_fasta: str,
     query_fa: str,
+    pairs_tsv: str,
     out_tsv: str,
     tmp_dir: str = ".",
     window_size: int = DEFAULT_ATTL_WINDOW_BP,
@@ -88,20 +114,23 @@ def main(
     Args:
         genome_fasta: Path to the sample genome FASTA file.
         query_fa: Path to ``mge_query.fa`` (tRNA sequences used as BLAST queries).
+        pairs_tsv: Path to ``integrase_trna.tsv``, the pairs behind the queries.
         out_tsv: Output path for the raw hits (``mge_blast_raw.tsv``).
         tmp_dir: Directory for temporary BLAST files.
         window_size: Length of the searched window in bp.
+
+    Raises:
+        ValueError: when a query is not one of the pairs, rather than leaving
+            its pair without hits.
     """
     genome = read_genome(genome_fasta)
+    pairs = read_pairs(pairs_tsv)
     frames: list[pd.DataFrame] = []
 
     for rec in SeqIO.parse(query_fa, "fasta"):
-        try:
-            integrase_id, contig, coord_range, strand = rec.id.strip().split(":")
-            trna_start, trna_end = map(int, coord_range.split("-"))
-        except ValueError:
-            logger.error(f"Malformed FASTA header: {rec.id}")
-            continue
+        if rec.id not in pairs:
+            raise ValueError(f"Query {rec.id} in {query_fa} is not a pair of {pairs_tsv}")
+        integrase_id, contig, trna_start, trna_end, strand = pairs[rec.id]
 
         if strand == "+":
             window_start, window_end = trna_end, trna_end + window_size
@@ -137,6 +166,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ffn", required=True, help="Genome FASTA path.")
     parser.add_argument("--query", required=True, help="mge_query.fa path.")
+    parser.add_argument("--pairs", required=True, help="integrase_trna.tsv path.")
     parser.add_argument("--out_tsv", required=True, help="Output mge_blast_raw.tsv path.")
     parser.add_argument("--tmp_dir", default=".", help="Temporary directory for BLAST.")
     parser.add_argument(
@@ -146,6 +176,6 @@ if __name__ == "__main__":
     cli_args = parser.parse_args()
     thresholds = load_thresholds(cli_args.params)
     main(
-        cli_args.ffn, cli_args.query, cli_args.out_tsv, cli_args.tmp_dir,
+        cli_args.ffn, cli_args.query, cli_args.pairs, cli_args.out_tsv, cli_args.tmp_dir,
         window_size=thresholds.attl_window_bp,
     )
